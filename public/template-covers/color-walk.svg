@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop stop-color="#B9EEF9"/>
+      <stop offset="1" stop-color="#FFD37C"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#70420f" flood-opacity=".22"/></filter>
+  </defs>
+  <rect width="640" height="360" rx="42" fill="url(#bg)"/>
+  <rect x="104" y="92" width="174" height="174" rx="38" fill="#fff" filter="url(#shadow)"/>
+  <rect x="348" y="74" width="186" height="186" rx="44" fill="#fff8df" filter="url(#shadow)"/>
+  <circle cx="191" cy="179" r="58" fill="#ff9f2f"/>
+  <path d="M159 172c19 22 45 22 64 0" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>
+  <path d="M410 139h62M398 179h92M416 219h48" stroke="#3c8aa0" stroke-width="16" stroke-linecap="round"/>
+  <path d="M122 92l-28-36M278 95l34-34M508 255l44 40" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+  <text x="44" y="62" fill="#2d2925" font-family="Arial, sans-serif" font-size="30" font-weight="800">Color Walk冰箱贴</text>
+  <text x="44" y="314" fill="#2d2925" font-family="Arial, sans-serif" font-size="18" font-weight="700">cute 3D magnet style</text>
+</svg>

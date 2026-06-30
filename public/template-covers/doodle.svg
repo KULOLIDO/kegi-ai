@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" rx="42" fill="#fbfbf1"/>
+  <path d="M154 243c-24-40-12-91 29-123 54-43 130-30 172 23 46 59 28 132-36 158-58 24-132-4-165-58z" fill="#fff" stroke="#202020" stroke-width="8"/>
+  <path d="M213 155c26 30 70 32 98 2M224 211c24 15 61 15 86-2" fill="none" stroke="#202020" stroke-width="8" stroke-linecap="round"/>
+  <path d="M103 111l40-38M497 94l54-30M482 240l72 34M112 285l-50 28" stroke="#ff9f2f" stroke-width="11" stroke-linecap="round"/>
+  <path d="M426 159c20-22 48-24 66-3 17 20 13 51-9 68-20 16-51 12-67-8" fill="none" stroke="#6fcde2" stroke-width="9" stroke-linecap="round"/>
+  <text x="44" y="62" fill="#2d2925" font-family="Arial, sans-serif" font-size="30" font-weight="800">丑萌涂鸦插画</text>
+  <text x="44" y="314" fill="#6b5a48" font-family="Arial, sans-serif" font-size="18" font-weight="700">playful doodle lines</text>
+</svg>

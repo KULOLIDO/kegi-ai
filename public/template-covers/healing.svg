@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#FFF3B7"/>
+      <stop offset="0.55" stop-color="#FFE2B8"/>
+      <stop offset="1" stop-color="#BDECF6"/>
+    </linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <rect width="640" height="360" rx="42" fill="url(#bg)"/>
+  <circle cx="116" cy="92" r="48" fill="#fff" opacity=".65"/>
+  <circle cx="532" cy="84" r="70" fill="#ff9f2f" opacity=".22" filter="url(#soft)"/>
+  <path d="M88 260c84-80 138-88 214-22 72 62 154 42 250-54v116H88z" fill="#fff7dc" opacity=".88"/>
+  <path d="M148 233c18-44 58-70 104-70 62 0 113 48 119 110H136c1-14 5-27 12-40z" fill="#f7a540" opacity=".82"/>
+  <circle cx="252" cy="150" r="46" fill="#fff6e5"/>
+  <path d="M228 147c18 18 46 18 64 0" fill="none" stroke="#57331f" stroke-width="9" stroke-linecap="round"/>
+  <path d="M182 95l46 42 38-57 34 58 50-38" fill="none" stroke="#ff9b2b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+  <text x="44" y="62" fill="#2d2925" font-family="Arial, sans-serif" font-size="30" font-weight="800">治愈插画</text>
+  <text x="44" y="314" fill="#6b5a48" font-family="Arial, sans-serif" font-size="18" font-weight="700">warm soft illustration</text>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#61D9F3"/>
+      <stop offset=".5" stop-color="#FFE17C"/>
+      <stop offset="1" stop-color="#FF8B9B"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" rx="42" fill="url(#sky)"/>
+  <circle cx="494" cy="94" r="56" fill="#ffe270"/>
+  <path d="M0 238h640v122H0z" fill="#243342"/>
+  <path d="M74 210h66v150H74zM170 176h88v184h-88zM292 222h72v138h-72zM414 190h108v170H414z" fill="#fff6d8"/>
+  <path d="M91 238h28M91 268h28M190 208h44M190 238h44M190 268h44M438 222h58M438 252h58M438 282h58" stroke="#ff9f2f" stroke-width="8" stroke-linecap="round"/>
+  <path d="M70 132c92-52 176-52 252 0 74 50 154 52 248 4" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".9"/>
+  <text x="44" y="62" fill="#2d2925" font-family="Arial, sans-serif" font-size="30" font-weight="800">City Pop插画</text>
+  <text x="44" y="326" fill="#fff" font-family="Arial, sans-serif" font-size="18" font-weight="800">retro urban neon</text>
+</svg>

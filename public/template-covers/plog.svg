@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <rect width="640" height="360" rx="42" fill="#fff6d8"/>
+  <rect x="70" y="82" width="222" height="214" rx="22" fill="#fff" stroke="#2d2925" stroke-width="5" transform="rotate(-5 181 189)"/>
+  <rect x="346" y="78" width="214" height="206" rx="22" fill="#c9f2f8" stroke="#2d2925" stroke-width="5" transform="rotate(6 453 181)"/>
+  <path d="M118 130h112M118 164h94M118 198h126" stroke="#ff9f2f" stroke-width="10" stroke-linecap="round"/>
+  <path d="M395 142c34-34 86-22 100 20 15 44-20 82-70 82-44 0-74-36-61-75" fill="#fff" opacity=".75"/>
+  <path d="M384 284c22-18 52-16 72 2M94 284c22-12 54-11 76 1" stroke="#2d2925" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="506" cy="94" r="22" fill="#ff9f2f"/>
+  <text x="44" y="56" fill="#2d2925" font-family="Arial, sans-serif" font-size="30" font-weight="800">手绘Plog</text>
+  <text x="44" y="324" fill="#6b5a48" font-family="Arial, sans-serif" font-size="18" font-weight="700">daily diary sketch</text>
+</svg>
