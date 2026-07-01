@@ -71,8 +71,19 @@ type CreditItem = {
   created_at: string;
 };
 
-type ViewName = "studio" | "history" | "cover" | "plaza" | "leaderboard" | "profile" | "templates";
+type ViewName = "studio" | "history" | "cover" | "plaza" | "leaderboard" | "profile" | "templates" | "users";
 type ProfileTab = "info" | "password" | "credits" | "recharge";
+
+type AdminUser = {
+  id: string;
+  email: string;
+  account: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  credits: number;
+  created_at: string;
+  updated_at: string | null;
+};
 
 type PlazaPost = {
   id: string;
@@ -158,6 +169,12 @@ export function CorgiStudio() {
   const [templates, setTemplates] = useState<CorgiTemplate[]>(defaultTemplates);
   const [adminTemplates, setAdminTemplates] = useState<CorgiTemplate[]>(defaultTemplates);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [adminUserQuery, setAdminUserQuery] = useState("");
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [usersNotice, setUsersNotice] = useState<string | null>(null);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ViewName>("studio");
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplates[0].id);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -246,6 +263,20 @@ export function CorgiStudio() {
       setIsAdmin(Boolean(payload.isAdmin));
     } catch {
       setIsAdmin(false);
+    }
+  }
+
+  async function loadAdminUsers(query = adminUserQuery) {
+    setIsUsersLoading(true);
+    setUsersError(null);
+    try {
+      const params = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : "";
+      const payload = await apiGet(`/api/admin/users${params}`);
+      setAdminUsers(payload.items ?? []);
+    } catch (userError) {
+      setUsersError(userError instanceof Error ? userError.message : "用户列表读取失败。");
+    } finally {
+      setIsUsersLoading(false);
     }
   }
 
@@ -345,7 +376,7 @@ export function CorgiStudio() {
         setHistoryItems([]);
         setCreditItems([]);
         setIsAdmin(false);
-        if (activeView === "templates") setActiveView("studio");
+        if (activeView === "templates" || activeView === "users") setActiveView("studio");
         setIsBooting(false);
         return;
       }
@@ -630,6 +661,62 @@ export function CorgiStudio() {
     }
   }
 
+  async function updateAdminUserCredits(userId: string, credits: number) {
+    setSavingUserId(userId);
+    setUsersError(null);
+    setUsersNotice(null);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders() ?? {})
+        },
+        body: JSON.stringify({
+          userId,
+          action: "set_credits",
+          credits,
+          note: "管理员设置积分"
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "积分修改失败。");
+      setAdminUsers((current) => current.map((item) => (item.id === userId ? payload.item : item)));
+      setUsersNotice("用户积分已更新。");
+    } catch (userError) {
+      setUsersError(userError instanceof Error ? userError.message : "积分修改失败。");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function resetAdminUserPassword(userId: string, password: string) {
+    setSavingUserId(userId);
+    setUsersError(null);
+    setUsersNotice(null);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders() ?? {})
+        },
+        body: JSON.stringify({
+          userId,
+          action: "reset_password",
+          password
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "密码重置失败。");
+      setUsersNotice("用户密码已重置。");
+    } catch (userError) {
+      setUsersError(userError instanceof Error ? userError.message : "密码重置失败。");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
   function formatAmount(amount: number) {
     return amount > 0 ? `+${amount}` : `${amount}`;
   }
@@ -664,7 +751,10 @@ export function CorgiStudio() {
           <NavButton active={activeView === "leaderboard"} onClick={() => { setActiveView("leaderboard"); void loadLeaderboard(); }} icon={<Trophy className="h-4 w-4" />} label="封神榜" />
           <NavButton active={activeView === "profile"} onClick={() => setActiveView("profile")} icon={<UserRound className="h-4 w-4" />} label="个人中心" />
           {isAdmin ? (
-            <NavButton active={activeView === "templates"} onClick={() => { setActiveView("templates"); void loadTemplates(); }} icon={<Settings2 className="h-4 w-4" />} label="模板管理" />
+            <>
+              <NavButton active={activeView === "users"} onClick={() => { setActiveView("users"); void loadAdminUsers(); }} icon={<UserRound className="h-4 w-4" />} label="用户管理" />
+              <NavButton active={activeView === "templates"} onClick={() => { setActiveView("templates"); void loadTemplates(); }} icon={<Settings2 className="h-4 w-4" />} label="模板管理" />
+            </>
           ) : null}
         </nav>
 
@@ -735,6 +825,21 @@ export function CorgiStudio() {
 
         {activeView === "templates" && isAdmin ? (
           <TemplatesAdminView templates={adminTemplates} error={templatesError} notice={templatesNotice} isLoading={isTemplatesLoading} savingTemplateId={savingTemplateId} onRefresh={loadTemplates} onChange={updateAdminTemplate} onSave={saveTemplate} />
+        ) : null}
+
+        {activeView === "users" && isAdmin ? (
+          <AdminUsersView
+            users={adminUsers}
+            query={adminUserQuery}
+            setQuery={setAdminUserQuery}
+            error={usersError}
+            notice={usersNotice}
+            isLoading={isUsersLoading}
+            savingUserId={savingUserId}
+            onRefresh={() => loadAdminUsers()}
+            onUpdateCredits={updateAdminUserCredits}
+            onResetPassword={resetAdminUserPassword}
+          />
         ) : null}
       </section>
 
@@ -1527,6 +1632,72 @@ function ProfileMenuButton({ active, icon, title, text, onClick }: { active: boo
       <span className={`grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-white/15" : "bg-skysoft/55 text-corgi"}`}>{icon}</span>
       <span><span className="block text-sm font-black">{title}</span><span className={`block text-xs ${active ? "text-white/60" : "text-ink/50"}`}>{text}</span></span>
     </button>
+  );
+}
+
+function AdminUsersView({ users, query, setQuery, error, notice, isLoading, savingUserId, onRefresh, onUpdateCredits, onResetPassword }: { users: AdminUser[]; query: string; setQuery: (value: string) => void; error: string | null; notice: string | null; isLoading: boolean; savingUserId: string | null; onRefresh: () => void; onUpdateCredits: (userId: string, credits: number) => void; onResetPassword: (userId: string, password: string) => void }) {
+  const [creditDrafts, setCreditDrafts] = useState<Record<string, string>>({});
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
+
+  function creditValue(user: AdminUser) {
+    return creditDrafts[user.id] ?? String(user.credits);
+  }
+
+  return (
+    <section className="rounded-[28px] border border-white/70 bg-white/60 p-5 shadow-glow backdrop-blur">
+      <SectionHeader label="后台管理" title="用户管理" actionLabel="刷新用户" loading={isLoading} icon={<UserRound className="h-4 w-4" />} onAction={onRefresh} />
+      <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onRefresh(); }} placeholder="搜索账号、邮箱或昵称" className="h-12 rounded-2xl border border-corgi/20 bg-white px-4 text-sm font-bold text-ink outline-none focus:border-corgi" />
+        <button type="button" onClick={onRefresh} className="h-12 rounded-2xl bg-ink px-5 text-sm font-black text-white">搜索</button>
+      </div>
+      {notice ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
+      {error ? <ErrorBox text={error} /> : null}
+      {isLoading && users.length === 0 ? (
+        <LoadingBlock />
+      ) : users.length === 0 ? (
+        <EmptyBlock title="没有找到用户" text="输入账号、邮箱或昵称搜索，也可以直接刷新查看最新用户。" />
+      ) : (
+        <div className="grid gap-4">
+          {users.map((item) => {
+            const isSaving = savingUserId === item.id;
+            return (
+              <article key={item.id} className="rounded-3xl border border-white/80 bg-white/70 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Avatar name={item.display_name ?? item.account} imageUrl={item.avatar_url} />
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-black text-ink">{item.display_name ?? item.account}</h3>
+                        <p className="break-all text-xs font-semibold text-ink/55">{item.account} · {item.email}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-xs font-bold text-ink/55 sm:grid-cols-3">
+                      <span>ID: {item.id.slice(0, 8)}...</span>
+                      <span>注册: {new Date(item.created_at).toLocaleString("zh-CN")}</span>
+                      <span>当前积分: {item.credits}</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 lg:min-w-[420px]">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <input type="number" min="0" step="1" value={creditValue(item)} onChange={(event) => setCreditDrafts((current) => ({ ...current, [item.id]: event.target.value }))} className="h-11 rounded-xl border border-corgi/20 bg-white px-3 text-sm font-bold text-ink outline-none focus:border-corgi" />
+                      <button type="button" disabled={isSaving} onClick={() => onUpdateCredits(item.id, Number(creditValue(item)))} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-corgi px-4 text-sm font-black text-white disabled:bg-corgi/40">
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Coins className="h-4 w-4" />}设置积分
+                      </button>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <input type="text" value={passwordDrafts[item.id] ?? ""} onChange={(event) => setPasswordDrafts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="输入临时新密码，至少 6 位" className="h-11 rounded-xl border border-corgi/20 bg-white px-3 text-sm font-bold text-ink outline-none focus:border-corgi" />
+                      <button type="button" disabled={isSaving} onClick={() => onResetPassword(item.id, passwordDrafts[item.id] ?? "")} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-black text-white disabled:bg-ink/35">
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}重置密码
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
