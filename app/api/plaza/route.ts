@@ -10,6 +10,7 @@ type PlazaPostRow = {
   id: string;
   title: string;
   description: string | null;
+  status?: "published" | "hidden" | null;
   created_at: string;
   user_id: string;
   generation: MaybeArray<{
@@ -32,6 +33,11 @@ function firstItem<T>(value: MaybeArray<T> | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function isMissingStatusColumn(error: { code?: string; message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return error?.code === "42703" || error?.code === "PGRST204" || message.includes("status") || message.includes("schema cache");
+}
+
 async function getUserId(request: NextRequest) {
   const accessToken = request.headers.get("authorization")?.replace("Bearer ", "");
   if (!accessToken) return null;
@@ -46,29 +52,55 @@ function profileName(profile: { display_name?: string | null; email?: string | n
   return profile?.display_name || profile?.email?.split("@")[0] || "柯基创作者";
 }
 
+async function readPlazaPosts(supabase: ReturnType<typeof createServiceClient>) {
+  const fullQuery = await supabase
+    .from("plaza_posts")
+    .select(`
+      id,
+      title,
+      description,
+      status,
+      created_at,
+      user_id,
+      generation:generations(id, template_name, output_image_url, ratio),
+      profile:profiles(display_name, avatar_url, email),
+      likes(id, user_id),
+      favorites(id, user_id)
+    `)
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .limit(80);
+
+  if (!fullQuery.error) return fullQuery.data ?? [];
+  if (!isMissingStatusColumn(fullQuery.error)) throw fullQuery.error;
+
+  console.warn("plaza_posts.status is missing, using legacy plaza read", fullQuery.error);
+  const legacyQuery = await supabase
+    .from("plaza_posts")
+    .select(`
+      id,
+      title,
+      description,
+      created_at,
+      user_id,
+      generation:generations(id, template_name, output_image_url, ratio),
+      profile:profiles(display_name, avatar_url, email),
+      likes(id, user_id),
+      favorites(id, user_id)
+    `)
+    .order("created_at", { ascending: false })
+    .limit(80);
+
+  if (legacyQuery.error) throw legacyQuery.error;
+  return legacyQuery.data ?? [];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createServiceClient();
     const userId = await getUserId(request);
     const sort = request.nextUrl.searchParams.get("sort") === "hot" ? "hot" : "new";
-
-    const { data: posts, error } = await supabase
-      .from("plaza_posts")
-      .select(`
-        id,
-        title,
-        description,
-        created_at,
-        user_id,
-        generation:generations(id, template_name, output_image_url, ratio),
-        profile:profiles(display_name, avatar_url, email),
-        likes(id, user_id),
-        favorites(id, user_id)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(80);
-
-    if (error) throw error;
+    const posts = await readPlazaPosts(supabase);
 
     const items = ((posts ?? []) as unknown as PlazaPostRow[]).map((post) => {
       const generation = firstItem(post.generation);
@@ -140,6 +172,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "只能发布自己的作品。" }, { status: 403 });
     }
 
+    const fullSave = await supabase
+      .from("plaza_posts")
+      .upsert(
+        {
+          generation_id: generationId,
+          user_id: userId,
+          title,
+          description: description || null,
+          status: "published",
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "generation_id" }
+      )
+      .select("id")
+      .single();
+
+    if (!fullSave.error && fullSave.data) return NextResponse.json({ id: fullSave.data.id });
+    if (!isMissingStatusColumn(fullSave.error)) throw fullSave.error;
+
+    console.warn("plaza_posts.status is missing, using legacy plaza publish", fullSave.error);
     const { data, error } = await supabase
       .from("plaza_posts")
       .upsert(

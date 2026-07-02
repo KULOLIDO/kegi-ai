@@ -38,6 +38,11 @@ function firstItem<T>(value: MaybeArray<T> | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function isMissingStatusColumn(error: { code?: string; message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return error?.code === "42703" || error?.code === "PGRST204" || message.includes("status") || message.includes("schema cache");
+}
+
 function displayName(profile: { display_name?: string | null; email?: string | null }) {
   return profile.display_name || profile.email?.split("@")[0] || "柯基创作者";
 }
@@ -49,31 +54,54 @@ function level(totalCredits: number) {
   return "新秀";
 }
 
+async function readHotPosts(supabase: ReturnType<typeof createServiceClient>) {
+  const fullQuery = await supabase
+    .from("plaza_posts")
+    .select(`
+      id,
+      title,
+      user_id,
+      generation:generations(output_image_url, template_name),
+      profile:profiles(display_name, email),
+      likes(id),
+      favorites(id)
+    `)
+    .eq("status", "published")
+    .limit(100);
+
+  if (!fullQuery.error) return fullQuery.data ?? [];
+  if (!isMissingStatusColumn(fullQuery.error)) throw fullQuery.error;
+
+  console.warn("plaza_posts.status is missing, using legacy leaderboard read", fullQuery.error);
+  const legacyQuery = await supabase
+    .from("plaza_posts")
+    .select(`
+      id,
+      title,
+      user_id,
+      generation:generations(output_image_url, template_name),
+      profile:profiles(display_name, email),
+      likes(id),
+      favorites(id)
+    `)
+    .limit(100);
+
+  if (legacyQuery.error) throw legacyQuery.error;
+  return legacyQuery.data ?? [];
+}
+
 export async function GET() {
   try {
     const supabase = createServiceClient();
-    const [{ data: profiles, error: profileError }, { data: posts, error: postError }] =
-      await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, display_name, email, avatar_url, credits, credit_transactions(amount)")
-          .limit(100),
-        supabase
-          .from("plaza_posts")
-          .select(`
-            id,
-            title,
-            user_id,
-            generation:generations(output_image_url, template_name),
-            profile:profiles(display_name, email),
-            likes(id),
-            favorites(id)
-          `)
-          .limit(100)
-      ]);
+    const [{ data: profiles, error: profileError }, posts] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, display_name, email, avatar_url, credits, credit_transactions(amount)")
+        .limit(100),
+      readHotPosts(supabase)
+    ]);
 
     if (profileError) throw profileError;
-    if (postError) throw postError;
 
     const creditBoard = ((profiles ?? []) as unknown as ProfileRow[])
       .map((profile) => {

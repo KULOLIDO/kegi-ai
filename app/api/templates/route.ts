@@ -70,6 +70,32 @@ function withCustomTemplate(items: CorgiTemplate[]) {
     : [...items, defaultTemplates.find((item) => item.id === "custom-image")!];
 }
 
+function composeTemplates(data: Partial<CorgiTemplate>[]) {
+  const dbById = new Map(data.map((template) => [String(template.id), template]));
+  const defaultIds = new Set(defaultTemplates.map((template) => template.id));
+  const mergedDefaults = defaultTemplates.map((fallback, index) =>
+    withAccent(dbById.get(fallback.id) ?? fallback, index)
+  );
+  const extraTemplates = data
+    .filter((template) => template.id && !defaultIds.has(String(template.id)))
+    .map((template, index) => withAccent(template, defaultTemplates.length + index));
+
+  return withCustomTemplate([...mergedDefaults, ...extraTemplates]).sort((left, right) => {
+    if (left.sort_order !== right.sort_order) return left.sort_order - right.sort_order;
+    return left.name.localeCompare(right.name, "zh-CN");
+  });
+}
+
+function dedupeTemplatesByName(items: CorgiTemplate[]) {
+  const seen = new Set<string>();
+  return items.filter((template) => {
+    const key = template.name.replace(/\s+/g, "").toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getAdminEmails() {
   return (process.env.ADMIN_EMAILS ?? process.env.TEMPLATE_ADMIN_EMAILS ?? "")
     .split(",")
@@ -105,16 +131,15 @@ async function isAdminRequest(request: NextRequest) {
   return getAdminEmails().includes(user.email.toLowerCase());
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const data = await readTemplates();
-    const dbById = new Map(
-      data.map((template) => [String(template.id), template as Partial<CorgiTemplate>])
+    const isAdmin = await isAdminRequest(request);
+    const includeInactive = isAdmin && request.nextUrl.searchParams.get("scope") === "admin";
+    const scopedItems = composeTemplates(data as Partial<CorgiTemplate>[]).filter(
+      (template) => includeInactive || template.is_active
     );
-    const dbTemplates = defaultTemplates.map((fallback, index) =>
-      withAccent(dbById.get(fallback.id) ?? fallback, index)
-    );
-    const items = withCustomTemplate(dbTemplates);
+    const items = includeInactive ? scopedItems : dedupeTemplatesByName(scopedItems);
 
     return NextResponse.json({
       items,
@@ -229,6 +254,35 @@ export async function POST(request: NextRequest) {
             ? error.message
             : "模板服务暂时不可用，请稍后再试。"
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!(await isAdminRequest(request))) {
+      return NextResponse.json({ error: "无权删除模板。" }, { status: 401 });
+    }
+
+    const id = request.nextUrl.searchParams.get("id")?.trim();
+    if (!id) {
+      return NextResponse.json({ error: "缺少模板 ID。" }, { status: 400 });
+    }
+
+    const supabase = createServiceClient();
+    const { error } = await supabase.from("templates").delete().eq("id", id);
+
+    if (error) {
+      console.error("Template delete failed", error);
+      throw new Error("模板删除失败，请确认 templates 表已创建。");
+    }
+
+    return NextResponse.json({ id });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "模板删除服务暂时不可用。" },
       { status: 500 }
     );
   }

@@ -54,6 +54,21 @@ alter table public.templates add column if not exists updated_at timestamptz not
 update public.templates set is_active = true where is_active is null;
 update public.templates set sort_order = 999 where sort_order is null;
 
+create table if not exists public.site_settings (
+  key text primary key,
+  value text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into public.site_settings (key, value, updated_at)
+values (
+  'public_notice',
+  '生成图片请遵守平台规则，请勿上传违规内容。作品生成或充值问题，可在个人中心联系管理员 KOLOLIDO。',
+  now()
+)
+on conflict (key) do nothing;
+
 create table if not exists public.generations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
@@ -117,16 +132,56 @@ create table if not exists public.credit_transactions (
 create index if not exists generations_user_created_idx on public.generations (user_id, created_at desc);
 create index if not exists credit_transactions_user_created_idx on public.credit_transactions (user_id, created_at desc);
 
+create table if not exists public.payment_orders (
+  id uuid primary key default gen_random_uuid(),
+  order_no text not null unique,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  provider text not null default 'xunhupay',
+  package_id text not null,
+  amount_yuan numeric(10,2) not null,
+  credits integer not null check (credits > 0),
+  status text not null default 'pending',
+  provider_order_id text,
+  pay_url text,
+  raw_notify jsonb,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.payment_orders add column if not exists provider text not null default 'xunhupay';
+alter table public.payment_orders add column if not exists package_id text not null default 'manual';
+alter table public.payment_orders add column if not exists amount_yuan numeric(10,2) not null default 0;
+alter table public.payment_orders add column if not exists credits integer not null default 1;
+alter table public.payment_orders add column if not exists status text not null default 'pending';
+alter table public.payment_orders add column if not exists provider_order_id text;
+alter table public.payment_orders add column if not exists pay_url text;
+alter table public.payment_orders add column if not exists raw_notify jsonb;
+alter table public.payment_orders add column if not exists paid_at timestamptz;
+alter table public.payment_orders add column if not exists created_at timestamptz not null default now();
+alter table public.payment_orders add column if not exists updated_at timestamptz not null default now();
+alter table public.payment_orders drop constraint if exists payment_orders_status_check;
+alter table public.payment_orders add constraint payment_orders_status_check check (status in ('pending', 'paid', 'failed', 'closed'));
+
+create index if not exists payment_orders_user_created_idx on public.payment_orders (user_id, created_at desc);
+create index if not exists payment_orders_status_idx on public.payment_orders (status);
+
 create table if not exists public.plaza_posts (
   id uuid primary key default gen_random_uuid(),
   generation_id uuid not null references public.generations(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   title text not null,
   description text,
+  status text not null default 'published',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (generation_id)
 );
+
+alter table public.plaza_posts add column if not exists status text not null default 'published';
+update public.plaza_posts set status = 'published' where status is null;
+alter table public.plaza_posts drop constraint if exists plaza_posts_status_check;
+alter table public.plaza_posts add constraint plaza_posts_status_check check (status in ('published', 'hidden'));
 
 create table if not exists public.likes (
   id uuid primary key default gen_random_uuid(),
@@ -145,6 +200,7 @@ create table if not exists public.favorites (
 );
 
 create index if not exists plaza_posts_created_idx on public.plaza_posts (created_at desc);
+create index if not exists plaza_posts_status_created_idx on public.plaza_posts (status, created_at desc);
 create index if not exists plaza_posts_user_created_idx on public.plaza_posts (user_id, created_at desc);
 create index if not exists likes_post_idx on public.likes (post_id);
 create index if not exists favorites_post_idx on public.favorites (post_id);
@@ -152,6 +208,7 @@ create index if not exists favorites_post_idx on public.favorites (post_id);
 alter table public.profiles enable row level security;
 alter table public.generations enable row level security;
 alter table public.credit_transactions enable row level security;
+alter table public.payment_orders enable row level security;
 alter table public.plaza_posts enable row level security;
 alter table public.likes enable row level security;
 alter table public.favorites enable row level security;
@@ -160,6 +217,7 @@ drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
 drop policy if exists "Users can read own generations" on public.generations;
 drop policy if exists "Users can read own credit transactions" on public.credit_transactions;
+drop policy if exists "Users can read own payment orders" on public.payment_orders;
 drop policy if exists "Anyone can read plaza posts" on public.plaza_posts;
 drop policy if exists "Users can create own plaza posts" on public.plaza_posts;
 drop policy if exists "Users can read likes" on public.likes;
@@ -173,6 +231,7 @@ create policy "Users can read own profile" on public.profiles for select using (
 create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id) with check (auth.uid() = id);
 create policy "Users can read own generations" on public.generations for select using (auth.uid() = user_id);
 create policy "Users can read own credit transactions" on public.credit_transactions for select using (auth.uid() = user_id);
+create policy "Users can read own payment orders" on public.payment_orders for select using (auth.uid() = user_id);
 create policy "Anyone can read plaza posts" on public.plaza_posts for select using (true);
 create policy "Users can create own plaza posts" on public.plaza_posts for insert with check (auth.uid() = user_id);
 create policy "Users can read likes" on public.likes for select using (true);

@@ -25,6 +25,7 @@ import {
   Send,
   Sparkles,
   Star,
+  Trash2,
   Trophy,
   UserRound,
   Wand2,
@@ -71,8 +72,8 @@ type CreditItem = {
   created_at: string;
 };
 
-type ViewName = "studio" | "history" | "cover" | "plaza" | "leaderboard" | "profile" | "templates" | "users";
-type ProfileTab = "info" | "password" | "credits" | "recharge";
+type ViewName = "studio" | "history" | "cover" | "plaza" | "leaderboard" | "profile" | "templates" | "users" | "settings" | "plazaAdmin";
+type ProfileTab = "info" | "password" | "credits" | "recharge" | "updates";
 
 type AdminUser = {
   id: string;
@@ -101,6 +102,12 @@ type PlazaPost = {
   favorited: boolean;
 };
 
+type AdminPlazaPost = PlazaPost & {
+  status: "published" | "hidden";
+};
+
+type RechargePackageId = "starter" | "creator" | "pro";
+
 type CreditRank = {
   rank: number;
   user_id: string;
@@ -128,6 +135,93 @@ const creditTypeLabel: Record<CreditItem["type"], string> = {
   adjust: "调整"
 };
 
+const updateLogs = [
+  {
+    version: "V1.4",
+    time: "2026-07-03 10:30",
+    title: "充值中心升级",
+    items: ["新增三档积分充值套餐", "支持在线支付后自动到账", "优化充值记录与积分流水展示"]
+  },
+  {
+    version: "V1.3",
+    time: "2026-07-03 09:40",
+    title: "广场管理升级",
+    items: ["管理员可查看广场作品", "支持作品下架与恢复展示", "优化广场与榜单展示规则"]
+  },
+  {
+    version: "V1.2",
+    time: "2026-07-02 19:30",
+    title: "后台管理优化",
+    items: ["模板支持删除和维护", "公告内容可在后台修改", "更新日志改为独立页面查看"]
+  },
+  {
+    version: "V1.1",
+    time: "2026-07-02 11:30",
+    title: "封面工坊细节优化",
+    items: ["更新封面水印显示", "修复空标题导出问题", "三图布局支持独立拖动与缩放"]
+  },
+  {
+    version: "V1.0",
+    time: "2026-07-01 23:40",
+    title: "封面工坊增强",
+    items: ["新增三图爆款布局", "支持边框颜色选择", "优化预览与导出一致性"]
+  },
+  {
+    version: "V0.9",
+    time: "2026-07-01 21:30",
+    title: "爆款封面工坊上线",
+    items: ["支持常用封面尺寸", "支持标题、图片和人物编辑", "支持导出高清 PNG"]
+  },
+  {
+    version: "V0.8",
+    time: "2026-07-01 18:30",
+    title: "上线准备优化",
+    items: ["完成线上运行配置", "整理域名与服务器方案", "优化访问和部署流程"]
+  },
+  {
+    version: "V0.7",
+    time: "2026-06-30 22:00",
+    title: "品牌与界面优化",
+    items: ["替换品牌图标", "更新模板封面", "调整导航、公告和页面文案"]
+  },
+  {
+    version: "V0.6",
+    time: "2026-06-30 18:30",
+    title: "社区与排行榜",
+    items: ["新增瞬间广场发布功能", "支持点赞和收藏", "新增积分榜与作品热度榜"]
+  },
+  {
+    version: "V0.5",
+    time: "2026-06-30 14:20",
+    title: "管理员后台",
+    items: ["新增管理员入口", "支持模板管理和用户管理", "支持模板排序、上下架和积分调整"]
+  },
+  {
+    version: "V0.4",
+    time: "2026-06-29 20:40",
+    title: "登录与个人中心",
+    items: ["新增账号密码注册登录", "新增个人信息和密码修改", "新增充值中心和积分流水入口"]
+  },
+  {
+    version: "V0.3",
+    time: "2026-06-29 16:00",
+    title: "作品系统",
+    items: ["新增我的作品页面", "支持上传图和生成图对比", "支持作品发布到广场"]
+  },
+  {
+    version: "V0.2",
+    time: "2026-06-28 18:00",
+    title: "图片生成体验优化",
+    items: ["支持参考图生成", "支持生成比例选择", "优化生成结果展示和下载"]
+  },
+  {
+    version: "V0.1",
+    time: "2026-06-27 22:30",
+    title: "MVP 初版",
+    items: ["完成首页和模板选择", "支持图片上传与风格生成", "完成基础积分和作品记录"]
+  }
+];
+
 function normalizeAccount(value: string) {
   return value.trim().toLowerCase();
 }
@@ -144,6 +238,26 @@ function validateAccount(account: string) {
 function validateLoginIdentifier(account: string) {
   const value = normalizeAccount(account);
   return value.includes("@") ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) : validateAccount(value);
+}
+
+function normalizeTemplateName(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase();
+}
+
+function getStudioTemplates(items: CorgiTemplate[]) {
+  const seen = new Set<string>();
+  return items
+    .filter((template) => template.is_active)
+    .sort((left, right) => {
+      if (left.sort_order !== right.sort_order) return left.sort_order - right.sort_order;
+      return left.name.localeCompare(right.name, "zh-CN");
+    })
+    .filter((template) => {
+      const key = normalizeTemplateName(template.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 export function CorgiStudio() {
@@ -165,6 +279,8 @@ export function CorgiStudio() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [profileTab, setProfileTab] = useState<ProfileTab>("info");
+  const [rechargingPackageId, setRechargingPackageId] = useState<RechargePackageId | null>(null);
+  const [rechargeError, setRechargeError] = useState<string | null>(null);
 
   const [templates, setTemplates] = useState<CorgiTemplate[]>(defaultTemplates);
   const [adminTemplates, setAdminTemplates] = useState<CorgiTemplate[]>(defaultTemplates);
@@ -185,9 +301,14 @@ export function CorgiStudio() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [creditItems, setCreditItems] = useState<CreditItem[]>([]);
   const [plazaItems, setPlazaItems] = useState<PlazaPost[]>([]);
+  const [adminPlazaItems, setAdminPlazaItems] = useState<AdminPlazaPost[]>([]);
   const [plazaSort, setPlazaSort] = useState<"new" | "hot">("hot");
   const [plazaError, setPlazaError] = useState<string | null>(null);
   const [isPlazaLoading, setIsPlazaLoading] = useState(false);
+  const [adminPlazaNotice, setAdminPlazaNotice] = useState<string | null>(null);
+  const [adminPlazaError, setAdminPlazaError] = useState<string | null>(null);
+  const [isAdminPlazaLoading, setIsAdminPlazaLoading] = useState(false);
+  const [updatingPlazaPostId, setUpdatingPlazaPostId] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<HistoryItem | null>(null);
   const [publishTitle, setPublishTitle] = useState("");
   const [publishDescription, setPublishDescription] = useState("");
@@ -202,11 +323,17 @@ export function CorgiStudio() {
   const [isCreditsLoading, setIsCreditsLoading] = useState(false);
   const [isTemplatesLoading, setIsTemplatesLoading] = useState(false);
   const [savingTemplateId, setSavingTemplateId] = useState<string | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [templatesNotice, setTemplatesNotice] = useState<string | null>(null);
+  const [publicNotice, setPublicNotice] = useState("生成图片请遵守平台规则，请勿上传违规内容。作品生成或充值问题，可在个人中心联系管理员 KOLOLIDO。");
+  const [settingsDraft, setSettingsDraft] = useState("");
+  const [settingsNotice, setSettingsNotice] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeTemplates = templates.filter((template) => template.is_active);
@@ -233,16 +360,17 @@ export function CorgiStudio() {
     setDisplayNameDraft(payload.display_name ?? payload.account ?? "");
   }
 
-  async function loadTemplates() {
+  async function loadTemplates(includeInactive = false) {
     setIsTemplatesLoading(true);
     setTemplatesError(null);
     try {
-      const payload = await apiGet("/api/templates");
+      const payload = await apiGet(includeInactive ? "/api/templates?scope=admin" : "/api/templates");
       const nextTemplates = payload.items?.length ? payload.items : defaultTemplates;
-      setTemplates(nextTemplates);
+      const visibleTemplates = getStudioTemplates(nextTemplates);
+      setTemplates(visibleTemplates);
       setAdminTemplates(nextTemplates);
-      if (!nextTemplates.some((template: CorgiTemplate) => template.id === selectedTemplateId)) {
-        setSelectedTemplateId(nextTemplates[0]?.id ?? defaultTemplates[0].id);
+      if (!visibleTemplates.some((template: CorgiTemplate) => template.id === selectedTemplateId)) {
+        setSelectedTemplateId(visibleTemplates[0]?.id ?? defaultTemplates[0].id);
       }
     } catch (templateError) {
       setTemplatesError(templateError instanceof Error ? templateError.message : "模板读取失败。");
@@ -250,6 +378,18 @@ export function CorgiStudio() {
       setAdminTemplates(defaultTemplates);
     } finally {
       setIsTemplatesLoading(false);
+    }
+  }
+
+  async function loadSiteSettings() {
+    try {
+      const response = await fetch("/api/site-settings");
+      const payload = await response.json();
+      const nextNotice = String(payload.publicNotice ?? publicNotice);
+      setPublicNotice(nextNotice);
+      setSettingsDraft(nextNotice);
+    } catch {
+      setSettingsDraft(publicNotice);
     }
   }
 
@@ -319,6 +459,20 @@ export function CorgiStudio() {
     }
   }
 
+  async function loadAdminPlaza() {
+    setIsAdminPlazaLoading(true);
+    setAdminPlazaError(null);
+    try {
+      const payload = await apiGet("/api/admin/plaza");
+      setAdminPlazaItems(payload.items ?? []);
+      setAdminPlazaNotice(payload.legacy ? "当前 Supabase 还没有 plaza_posts.status 字段，已使用兼容模式读取；如需下架作品，请先执行最新 SQL。" : null);
+    } catch (adminPlazaLoadError) {
+      setAdminPlazaError(adminPlazaLoadError instanceof Error ? adminPlazaLoadError.message : "广场管理读取失败。");
+    } finally {
+      setIsAdminPlazaLoading(false);
+    }
+  }
+
   async function loadLeaderboard() {
     setIsLeaderboardLoading(true);
     setLeaderboardError(null);
@@ -349,7 +503,7 @@ export function CorgiStudio() {
       if (!mounted) return;
       setUser(session?.user ?? null);
       setAccessToken(session?.access_token ?? null);
-      await loadTemplates();
+      await Promise.all([loadTemplates(), loadSiteSettings()]);
       setIsBooting(false);
     }
 
@@ -376,7 +530,7 @@ export function CorgiStudio() {
         setHistoryItems([]);
         setCreditItems([]);
         setIsAdmin(false);
-        if (activeView === "templates" || activeView === "users") setActiveView("studio");
+        if (activeView === "templates" || activeView === "users" || activeView === "settings" || activeView === "plazaAdmin") setActiveView("studio");
         setIsBooting(false);
         return;
       }
@@ -631,10 +785,63 @@ export function CorgiStudio() {
     }
   }
 
+  async function updateAdminPlazaStatus(post: AdminPlazaPost, status: "published" | "hidden") {
+    if (status === "hidden" && !window.confirm(`确定下架「${post.title}」吗？下架后普通用户将看不到。`)) return;
+
+    setUpdatingPlazaPostId(post.id);
+    setAdminPlazaNotice(null);
+    setAdminPlazaError(null);
+    try {
+      const response = await fetch("/api/admin/plaza", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders() ?? {})
+        },
+        body: JSON.stringify({ id: post.id, status })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "广场作品状态更新失败。");
+      setAdminPlazaItems((current) => current.map((item) => (item.id === post.id ? { ...item, status } : item)));
+      setPlazaItems((current) => (status === "hidden" ? current.filter((item) => item.id !== post.id) : current));
+      setAdminPlazaNotice(status === "hidden" ? `已下架：${post.title}` : `已恢复：${post.title}`);
+    } catch (adminPlazaUpdateError) {
+      setAdminPlazaError(adminPlazaUpdateError instanceof Error ? adminPlazaUpdateError.message : "广场作品状态更新失败。");
+    } finally {
+      setUpdatingPlazaPostId(null);
+    }
+  }
+
   function updateAdminTemplate(id: string, patch: Partial<CorgiTemplate>) {
     setAdminTemplates((current) =>
       current.map((template) => (template.id === id ? { ...template, ...patch } : template))
     );
+  }
+
+  function createAdminTemplate() {
+    const nextOrder =
+      Math.max(0, ...adminTemplates.map((template) => Number(template.sort_order) || 0)) + 10;
+    const id =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `template-${Date.now()}`;
+    const draft: CorgiTemplate = {
+      id,
+      name: "新模板",
+      tagline: "新风格模板",
+      description: "新风格模板",
+      cover_url: null,
+      cost: 30,
+      size: "1024x1024",
+      accent: "from-corgi to-skysoft",
+      prompt: "请填写这个模板的图片生成提示词。",
+      is_active: false,
+      sort_order: nextOrder
+    };
+
+    setAdminTemplates((current) => [...current, draft]);
+    setTemplatesNotice("已新增一个未上架模板，填写内容后点击保存模板。");
+    setTemplatesError(null);
   }
 
   async function saveTemplate(template: CorgiTemplate) {
@@ -653,11 +860,60 @@ export function CorgiStudio() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "模板保存失败。");
       setTemplatesNotice(`已保存：${payload.item.name}`);
-      await loadTemplates();
+      await loadTemplates(true);
     } catch (saveError) {
       setTemplatesError(saveError instanceof Error ? saveError.message : "模板保存失败。");
     } finally {
       setSavingTemplateId(null);
+    }
+  }
+
+  async function deleteTemplate(template: CorgiTemplate) {
+    if (!window.confirm(`确定删除模板「${template.name}」吗？删除后不可恢复。`)) return;
+
+    setDeletingTemplateId(template.id);
+    setTemplatesError(null);
+    setTemplatesNotice(null);
+    try {
+      const response = await fetch(`/api/templates?id=${encodeURIComponent(template.id)}`, {
+        method: "DELETE",
+        headers: authHeaders() ?? {}
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "模板删除失败。");
+      setTemplatesNotice(`已删除：${template.name}`);
+      setAdminTemplates((current) => current.filter((item) => item.id !== template.id));
+      setTemplates((current) => current.filter((item) => item.id !== template.id));
+      await loadTemplates(true);
+    } catch (deleteError) {
+      setTemplatesError(deleteError instanceof Error ? deleteError.message : "模板删除失败。");
+    } finally {
+      setDeletingTemplateId(null);
+    }
+  }
+
+  async function saveSiteSettings() {
+    setIsSettingsSaving(true);
+    setSettingsError(null);
+    setSettingsNotice(null);
+    try {
+      const response = await fetch("/api/site-settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders() ?? {})
+        },
+        body: JSON.stringify({ publicNotice: settingsDraft })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "公告保存失败。");
+      setPublicNotice(payload.publicNotice);
+      setSettingsDraft(payload.publicNotice);
+      setSettingsNotice("公告内容已更新。");
+    } catch (settingsSaveError) {
+      setSettingsError(settingsSaveError instanceof Error ? settingsSaveError.message : "公告保存失败。");
+    } finally {
+      setIsSettingsSaving(false);
     }
   }
 
@@ -717,6 +973,33 @@ export function CorgiStudio() {
     }
   }
 
+  async function startRecharge(packageId: RechargePackageId) {
+    if (!profile) {
+      setRechargeError("请先登录后再充值。");
+      return;
+    }
+
+    setRechargingPackageId(packageId);
+    setRechargeError(null);
+    try {
+      const response = await fetch("/api/pay/xunhupay/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authHeaders() ?? {})
+        },
+        body: JSON.stringify({ packageId })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "创建支付订单失败。");
+      window.open(payload.payUrl, "_blank", "noopener,noreferrer");
+    } catch (rechargeCreateError) {
+      setRechargeError(rechargeCreateError instanceof Error ? rechargeCreateError.message : "创建支付订单失败。");
+    } finally {
+      setRechargingPackageId(null);
+    }
+  }
+
   function formatAmount(amount: number) {
     return amount > 0 ? `+${amount}` : `${amount}`;
   }
@@ -741,7 +1024,7 @@ export function CorgiStudio() {
           notice={authNotice}
         />
 
-        <PublicNotice />
+        <PublicNotice content={publicNotice} />
 
         <nav className="flex w-full flex-wrap rounded-2xl bg-white/55 p-2 shadow-sm backdrop-blur sm:w-fit">
           <NavButton active={activeView === "studio"} onClick={() => setActiveView("studio")} icon={<Wand2 className="h-4 w-4" />} label="创作台" />
@@ -753,7 +1036,9 @@ export function CorgiStudio() {
           {isAdmin ? (
             <>
               <NavButton active={activeView === "users"} onClick={() => { setActiveView("users"); void loadAdminUsers(); }} icon={<UserRound className="h-4 w-4" />} label="用户管理" />
-              <NavButton active={activeView === "templates"} onClick={() => { setActiveView("templates"); void loadTemplates(); }} icon={<Settings2 className="h-4 w-4" />} label="模板管理" />
+              <NavButton active={activeView === "templates"} onClick={() => { setActiveView("templates"); void loadTemplates(true); }} icon={<Settings2 className="h-4 w-4" />} label="模板管理" />
+              <NavButton active={activeView === "plazaAdmin"} onClick={() => { setActiveView("plazaAdmin"); void loadAdminPlaza(); }} icon={<Images className="h-4 w-4" />} label="广场管理" />
+              <NavButton active={activeView === "settings"} onClick={() => { setActiveView("settings"); setSettingsDraft(publicNotice); }} icon={<Settings2 className="h-4 w-4" />} label="站点设置" />
             </>
           ) : null}
         </nav>
@@ -820,11 +1105,18 @@ export function CorgiStudio() {
             isCreditsLoading={isCreditsLoading}
             onRefreshCredits={loadCredits}
             formatAmount={formatAmount}
+            rechargeError={rechargeError}
+            rechargingPackageId={rechargingPackageId}
+            onRecharge={startRecharge}
           />
         ) : null}
 
         {activeView === "templates" && isAdmin ? (
-          <TemplatesAdminView templates={adminTemplates} error={templatesError} notice={templatesNotice} isLoading={isTemplatesLoading} savingTemplateId={savingTemplateId} onRefresh={loadTemplates} onChange={updateAdminTemplate} onSave={saveTemplate} />
+          <TemplatesAdminView templates={adminTemplates} error={templatesError} notice={templatesNotice} isLoading={isTemplatesLoading} savingTemplateId={savingTemplateId} deletingTemplateId={deletingTemplateId} onRefresh={() => loadTemplates(true)} onCreate={createAdminTemplate} onChange={updateAdminTemplate} onSave={saveTemplate} onDelete={deleteTemplate} />
+        ) : null}
+
+        {activeView === "plazaAdmin" && isAdmin ? (
+          <AdminPlazaView items={adminPlazaItems} error={adminPlazaError} notice={adminPlazaNotice} isLoading={isAdminPlazaLoading} updatingPostId={updatingPlazaPostId} onRefresh={loadAdminPlaza} onUpdateStatus={updateAdminPlazaStatus} />
         ) : null}
 
         {activeView === "users" && isAdmin ? (
@@ -841,6 +1133,17 @@ export function CorgiStudio() {
             onResetPassword={resetAdminUserPassword}
           />
         ) : null}
+
+        {activeView === "settings" && isAdmin ? (
+          <AdminSettingsView
+            publicNotice={settingsDraft}
+            setPublicNotice={setSettingsDraft}
+            notice={settingsNotice}
+            error={settingsError}
+            isSaving={isSettingsSaving}
+            onSave={saveSiteSettings}
+          />
+        ) : null}
       </section>
 
       {result ? <ResultModal result={result} onClose={() => setResult(null)} /> : null}
@@ -851,7 +1154,7 @@ export function CorgiStudio() {
   );
 }
 
-function PublicNotice() {
+function PublicNotice({ content }: { content: string }) {
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-corgi/20 bg-white/60 px-4 py-3 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
       <div className="flex min-w-0 items-start gap-3">
@@ -860,9 +1163,7 @@ function PublicNotice() {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-black text-ink">公告</p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-ink/70">
-            生成图片请遵守平台规则，请勿上传违规内容。作品生成或充值问题，可在个人中心联系管理员 KOLOLIDO。
-          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-ink/70">{content}</p>
         </div>
       </div>
       <button
@@ -973,7 +1274,9 @@ function StudioView({ templates, selectedTemplate, selectedTemplateId, setSelect
 
 type CoverSize = "xiaohongshu" | "video";
 type CoverStyle = "redbook" | "ai" | "videoKnowledge" | "tutorial";
-type DragLayer = "title" | "background" | "person";
+type CoverLayout = "classic" | "threeStack";
+type StackDragLayer = "stack-0" | "stack-1" | "stack-2";
+type DragLayer = "title" | "background" | "person" | StackDragLayer;
 type CoverFont = "sans" | "serif" | "rounded" | "mono";
 type TextColorMode = "solid" | "gradient";
 
@@ -1035,9 +1338,15 @@ const coverStyles: Record<CoverStyle, { label: string; title: string; subtitle: 
   }
 };
 
+const coverLayouts: Record<CoverLayout, { label: string; description: string }> = {
+  classic: { label: "经典爆款", description: "背景图 + 人物图 + 标题框" },
+  threeStack: { label: "三图爆款", description: "三张图片上中下排版" }
+};
+
 function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }: { historyItems: HistoryItem[]; isHistoryLoading: boolean; onRefreshHistory: () => void }) {
   const [coverSize, setCoverSize] = useState<CoverSize>("xiaohongshu");
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("redbook");
+  const [coverLayout, setCoverLayout] = useState<CoverLayout>("classic");
   const [title, setTitle] = useState("3分钟看懂AI图片爆款玩法");
   const [subtitle, setSubtitle] = useState("柯基AI实战案例");
   const [coverFont, setCoverFont] = useState<CoverFont>("sans");
@@ -1050,6 +1359,13 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
   const [gradientTo, setGradientTo] = useState("#22b8cf");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [personUrl, setPersonUrl] = useState<string | null>(null);
+  const [stackImageUrls, setStackImageUrls] = useState<Array<string | null>>([null, null, null]);
+  const [stackImagePositions, setStackImagePositions] = useState([
+    { x: 50, y: 50 },
+    { x: 50, y: 50 },
+    { x: 50, y: 50 }
+  ]);
+  const [stackImageScales, setStackImageScales] = useState([100, 100, 100]);
   const [backgroundPosition, setBackgroundPosition] = useState({ x: 50, y: 50 });
   const [personPosition, setPersonPosition] = useState({ x: 68, y: 66 });
   const [titlePosition, setTitlePosition] = useState({ x: 10, y: 12 });
@@ -1061,6 +1377,9 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
   const [exportedCoverBlob, setExportedCoverBlob] = useState<Blob | null>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
   const personInputRef = useRef<HTMLInputElement>(null);
+  const stackTopInputRef = useRef<HTMLInputElement>(null);
+  const stackMiddleInputRef = useRef<HTMLInputElement>(null);
+  const stackBottomInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const size = coverSizes[coverSize];
   const style = coverStyles[coverStyle];
@@ -1090,16 +1409,33 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
     };
   }, [backgroundUrl, personUrl, exportedCoverUrl]);
 
-  function setImageFromFile(file: File | undefined, target: "background" | "person") {
+  function setImageFromFile(file: File | undefined, target: "background" | "person" | number) {
     if (!file || !file.type.startsWith("image/")) return;
     const nextUrl = URL.createObjectURL(file);
     if (target === "background") {
       if (backgroundUrl?.startsWith("blob:")) URL.revokeObjectURL(backgroundUrl);
       setBackgroundUrl(nextUrl);
-    } else {
+    } else if (target === "person") {
       if (personUrl?.startsWith("blob:")) URL.revokeObjectURL(personUrl);
       setPersonUrl(nextUrl);
+    } else {
+      setStackImageUrls((current) => {
+        const next = [...current];
+        const previous = next[target];
+        if (previous?.startsWith("blob:")) URL.revokeObjectURL(previous);
+        next[target] = nextUrl;
+        return next;
+      });
     }
+  }
+
+  function setStackImageFromUrl(url: string) {
+    setStackImageUrls((current) => {
+      const next = [...current];
+      const index = next.findIndex((item) => !item);
+      next[index >= 0 ? index : 0] = url;
+      return next;
+    });
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
@@ -1107,6 +1443,16 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
     const rect = previewRef.current.getBoundingClientRect();
     const x = Math.min(100, Math.max(0, ((event.clientX - rect.left) / rect.width) * 100));
     const y = Math.min(100, Math.max(0, ((event.clientY - rect.top) / rect.height) * 100));
+    if (activeDrag.startsWith("stack-")) {
+      const index = Number(activeDrag.replace("stack-", ""));
+      const layout = getThreeStackLayout(100, 100);
+      const card = layout[index];
+      if (!card) return;
+      const imageX = Math.min(100, Math.max(0, ((x - card.x) / card.width) * 100));
+      const imageY = Math.min(100, Math.max(0, ((y - card.y) / card.height) * 100));
+      setStackImagePositions((current) => current.map((item, itemIndex) => (itemIndex === index ? { x: imageX, y: imageY } : item)));
+      return;
+    }
     if (activeDrag === "title") setTitlePosition({ x, y });
     if (activeDrag === "person") setPersonPosition({ x, y });
     if (activeDrag === "background") setBackgroundPosition({ x, y });
@@ -1154,22 +1500,27 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
       const context = canvas.getContext("2d");
       if (!context) throw new Error("浏览器不支持 PNG 导出。");
       drawCoverBase(context, size.width, size.height, coverStyle);
-      if (backgroundUrl) {
-        const background = await loadCanvasImage(backgroundUrl);
-        drawCoverImage(context, background, size.width, size.height, backgroundPosition.x, backgroundPosition.y, 1.16);
-      }
-      drawCoverOverlay(context, size.width, size.height, coverStyle);
-      if (personUrl) {
-        const person = await loadCanvasImage(personUrl);
-        const personWidth = (size.width * personScale) / 100;
-        const personHeight = personWidth * (person.naturalHeight / person.naturalWidth);
-        const left = (size.width * personPosition.x) / 100 - personWidth / 2;
-        const top = (size.height * personPosition.y) / 100 - personHeight / 2;
-        context.shadowColor = "rgba(0,0,0,.24)";
-        context.shadowBlur = 30;
-        context.shadowOffsetY = 18;
-        context.drawImage(person, left, top, personWidth, personHeight);
-        context.shadowColor = "transparent";
+      if (coverLayout === "threeStack") {
+        const loadedImages = await Promise.all(stackImageUrls.map((url) => (url ? loadCanvasImage(url) : Promise.resolve(null))));
+        drawThreeStackCover(context, loadedImages, stackImagePositions, stackImageScales, size.width, size.height, coverStyle);
+      } else {
+        if (backgroundUrl) {
+          const background = await loadCanvasImage(backgroundUrl);
+          drawCoverImage(context, background, size.width, size.height, backgroundPosition.x, backgroundPosition.y, 1.16);
+        }
+        drawCoverOverlay(context, size.width, size.height, coverStyle);
+        if (personUrl) {
+          const person = await loadCanvasImage(personUrl);
+          const personWidth = (size.width * personScale) / 100;
+          const personHeight = personWidth * (person.naturalHeight / person.naturalWidth);
+          const left = (size.width * personPosition.x) / 100 - personWidth / 2;
+          const top = (size.height * personPosition.y) / 100 - personHeight / 2;
+          context.shadowColor = "rgba(0,0,0,.24)";
+          context.shadowBlur = 30;
+          context.shadowOffsetY = 18;
+          context.drawImage(person, left, top, personWidth, personHeight);
+          context.shadowColor = "transparent";
+        }
       }
       drawCoverText(context, title, subtitle, size.width, size.height, titlePosition.x, titlePosition.y, coverStyle, textOptions);
       const dataUrl = canvas.toDataURL("image/png");
@@ -1247,6 +1598,16 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
           </Field>
           <Field label="爆款风格">
             <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(coverLayouts) as CoverLayout[]).map((item) => (
+                <button key={item} type="button" onClick={() => setCoverLayout(item)} className={`min-h-11 rounded-xl px-2 py-2 text-sm font-black ${coverLayout === item ? "bg-ink text-white" : "bg-cream text-ink"}`}>
+                  <span className="block">{coverLayouts[item].label}</span>
+                  <span className={`block text-[10px] font-bold ${coverLayout === item ? "text-white/65" : "text-ink/45"}`}>{coverLayouts[item].description}</span>
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="边框颜色">
+            <div className="grid grid-cols-2 gap-2">
               {(Object.keys(coverStyles) as CoverStyle[]).map((item) => (
                 <button key={item} type="button" onClick={() => setCoverStyle(item)} className={`h-11 rounded-xl text-sm font-black ${coverStyle === item ? "bg-corgi text-white" : "bg-white text-ink"}`}>
                   {coverStyles[item].label}
@@ -1303,16 +1664,53 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
               </div>
             )}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input ref={backgroundInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], "background")} />
-            <input ref={personInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], "person")} />
-            <button type="button" onClick={() => backgroundInputRef.current?.click()} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white text-sm font-black text-ink"><ImagePlus className="h-4 w-4" />背景图</button>
-            <button type="button" onClick={() => personInputRef.current?.click()} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white text-sm font-black text-ink"><UserRound className="h-4 w-4" />人物照</button>
-          </div>
-          <button type="button" onClick={applySmartCutout} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-black text-white"><Scissors className="h-4 w-4" />智能抠图</button>
-          <Field label={`人物大小 ${personScale}%`}>
-            <input type="range" min="18" max="85" value={personScale} onChange={(event) => setPersonScale(Number(event.target.value))} className="w-full accent-orange-400" />
-          </Field>
+          {coverLayout === "threeStack" ? (
+            <div className="rounded-2xl bg-white/70 p-3">
+              <p className="mb-3 text-sm font-black text-ink">三图素材</p>
+              <input ref={stackTopInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], 0)} />
+              <input ref={stackMiddleInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], 1)} />
+              <input ref={stackBottomInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], 2)} />
+              <div className="grid gap-2">
+                {[
+                  { label: "上图", ref: stackTopInputRef, url: stackImageUrls[0] },
+                  { label: "中图", ref: stackMiddleInputRef, url: stackImageUrls[1] },
+                  { label: "下图", ref: stackBottomInputRef, url: stackImageUrls[2] }
+                ].map((item, index) => (
+                  <div key={item.label} className="rounded-xl bg-cream p-2">
+                    <button type="button" onClick={() => item.ref.current?.click()} className="grid w-full grid-cols-[64px_1fr] items-center gap-3 text-left">
+                      {item.url ? <img src={item.url} alt={item.label} className="aspect-square rounded-lg object-cover" /> : <span className="grid aspect-square place-items-center rounded-lg bg-white text-corgi"><ImagePlus className="h-5 w-5" /></span>}
+                      <span>
+                        <span className="block text-sm font-black text-ink">{item.label}</span>
+                        <span className="block text-xs font-bold text-ink/45">点击上传第 {index + 1} 张图片</span>
+                      </span>
+                    </button>
+                    <label className="mt-2 block text-xs font-black text-corgi">图片大小 {stackImageScales[index]}%</label>
+                    <input
+                      type="range"
+                      min="80"
+                      max="180"
+                      value={stackImageScales[index]}
+                      onChange={(event) => setStackImageScales((current) => current.map((value, itemIndex) => (itemIndex === index ? Number(event.target.value) : value)))}
+                      className="w-full accent-orange-400"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input ref={backgroundInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], "background")} />
+                <input ref={personInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => setImageFromFile(event.target.files?.[0], "person")} />
+                <button type="button" onClick={() => backgroundInputRef.current?.click()} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white text-sm font-black text-ink"><ImagePlus className="h-4 w-4" />背景图</button>
+                <button type="button" onClick={() => personInputRef.current?.click()} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-white text-sm font-black text-ink"><UserRound className="h-4 w-4" />人物照</button>
+              </div>
+              <button type="button" onClick={applySmartCutout} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-black text-white"><Scissors className="h-4 w-4" />智能抠图</button>
+              <Field label={`人物大小 ${personScale}%`}>
+                <input type="range" min="18" max="85" value={personScale} onChange={(event) => setPersonScale(Number(event.target.value))} className="w-full accent-orange-400" />
+              </Field>
+            </>
+          )}
           <div className="rounded-2xl bg-white/70 p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-sm font-black text-ink">从我的作品选图</p>
@@ -1321,7 +1719,7 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             <div className="grid max-h-[220px] grid-cols-3 gap-2 overflow-auto pr-1">
               {historyItems.length === 0 ? <p className="col-span-3 text-xs font-bold text-ink/45">暂无作品，可先去创作台生成。</p> : null}
               {historyItems.map((item) => (
-                <button key={item.id} type="button" onClick={() => setBackgroundUrl(item.output_image_url)} className="overflow-hidden rounded-xl border border-white bg-cream">
+                <button key={item.id} type="button" onClick={() => coverLayout === "threeStack" ? setStackImageFromUrl(item.output_image_url) : setBackgroundUrl(item.output_image_url)} className="overflow-hidden rounded-xl border border-white bg-cream">
                   <img src={item.output_image_url} alt={item.template_name} className="aspect-square w-full object-cover" />
                 </button>
               ))}
@@ -1366,6 +1764,26 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             className={`relative w-full select-none overflow-hidden rounded-[28px] border border-white bg-gradient-to-br ${style.bg} shadow-glow`}
             style={{ aspectRatio: size.ratio }}
           >
+            {coverLayout === "threeStack" ? (
+              <div className="absolute inset-0 z-10 grid gap-[2.4%] p-[5%]">
+                {[0, 1, 2].map((index) => (
+                  <div key={index} className="relative overflow-hidden rounded-[24px] border-[6px] border-white bg-cream shadow-xl">
+                    {stackImageUrls[index] ? (
+                      <img
+                        src={stackImageUrls[index] ?? ""}
+                        alt={`三图素材 ${index + 1}`}
+                        draggable={false}
+                        onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActiveDrag(`stack-${index}` as StackDragLayer); }}
+                        className="h-full w-full cursor-grab object-cover"
+                        style={{ objectPosition: `${stackImagePositions[index].x}% ${stackImagePositions[index].y}%`, transform: `scale(${stackImageScales[index] / 100})` }}
+                      />
+                    ) : (
+                      <div className="grid h-full place-items-center text-sm font-black text-ink/30">上传第 {index + 1} 张图片</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {backgroundUrl ? (
               <img
                 src={backgroundUrl}
@@ -1392,13 +1810,13 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             ) : null}
             <div
               onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActiveDrag("title"); }}
-              className="absolute max-w-[78%] cursor-grab rounded-3xl bg-white/72 p-[4%] shadow-xl backdrop-blur-sm"
+              className="absolute z-20 max-w-[78%] cursor-grab rounded-3xl bg-white/72 p-[4%] shadow-xl backdrop-blur-sm"
               style={{ left: `${titlePosition.x}%`, top: `${titlePosition.y}%`, boxShadow: style.shadow }}
             >
               <h3 className="break-words font-black leading-[1.04] tracking-normal" style={titlePreviewStyle}>{title}</h3>
               {subtitle ? <p className="mt-3 break-words font-black tracking-normal" style={subtitlePreviewStyle}>{subtitle}</p> : null}
             </div>
-            <div className="absolute bottom-[5%] left-[6%] rounded-full bg-ink/82 px-4 py-2 text-xs font-black text-white backdrop-blur">柯基AI</div>
+            <div className="absolute bottom-[5%] left-[6%] z-20 rounded-full bg-ink/82 px-4 py-2 text-xs font-black text-white backdrop-blur">kejiai.xyz</div>
           </div>
         </div>
       </section>
@@ -1464,14 +1882,94 @@ function drawCoverOverlay(context: CanvasRenderingContext2D, width: number, heig
   context.arc(width * 0.9, height * 0.1, Math.min(width, height) * 0.06, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = "rgba(47,42,36,.82)";
-  roundRect(context, width * 0.06, height * 0.91, 170, 56, 28);
+  roundRect(context, width * 0.06, height * 0.91, 210, 56, 28);
   context.fill();
   context.fillStyle = "#ffffff";
   context.font = "900 28px sans-serif";
-  context.fillText("柯基AI", width * 0.06 + 34, height * 0.91 + 37);
+  context.fillText("kejiai.xyz", width * 0.06 + 34, height * 0.91 + 37);
+}
+
+function getThreeStackLayout(width: number, height: number) {
+  const marginX = width * 0.05;
+  const marginY = height * 0.05;
+  const gap = height * 0.024;
+  const cardWidth = width - marginX * 2;
+  const cardHeight = (height - marginY * 2 - gap * 2) / 3;
+  return [0, 1, 2].map((index) => ({
+    x: marginX,
+    y: marginY + index * (cardHeight + gap),
+    width: cardWidth,
+    height: cardHeight
+  }));
+}
+
+function drawImageCoverInRect(context: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number, position: { x: number; y: number }, scale = 100) {
+  const imageRatio = image.naturalWidth / image.naturalHeight;
+  const rectRatio = width / height;
+  let drawWidth = width;
+  let drawHeight = height;
+  if (imageRatio > rectRatio) drawWidth = drawHeight * imageRatio;
+  else drawHeight = drawWidth / imageRatio;
+  const scaleRatio = Math.max(0.8, scale / 100);
+  drawWidth *= scaleRatio;
+  drawHeight *= scaleRatio;
+
+  const overflowX = Math.max(0, drawWidth - width);
+  const overflowY = Math.max(0, drawHeight - height);
+  const left = x - overflowX * (position.x / 100);
+  const top = y - overflowY * (position.y / 100);
+  context.drawImage(image, left, top, drawWidth, drawHeight);
+}
+
+function drawThreeStackCover(context: CanvasRenderingContext2D, images: Array<HTMLImageElement | null>, positions: Array<{ x: number; y: number }>, scales: number[], width: number, height: number, style: CoverStyle) {
+  context.fillStyle = "rgba(255,255,255,.2)";
+  context.fillRect(0, 0, width, height);
+  const accentColor = style === "redbook" ? "#ff4f7b" : style === "ai" ? "#54c6eb" : style === "tutorial" ? "#1f8f6a" : "#f59e3d";
+  const cards = getThreeStackLayout(width, height);
+
+  images.forEach((image, index) => {
+    const card = cards[index];
+    context.save();
+    context.shadowColor = "rgba(0,0,0,.2)";
+    context.shadowBlur = 28;
+    context.shadowOffsetY = 14;
+    context.fillStyle = "#ffffff";
+    roundRect(context, card.x, card.y, card.width, card.height, 42);
+    context.fill();
+    context.shadowColor = "transparent";
+    context.lineWidth = Math.max(8, width * 0.008);
+    context.strokeStyle = index === 1 ? accentColor : "rgba(255,255,255,.95)";
+    context.stroke();
+    context.clip();
+    if (image) {
+      drawImageCoverInRect(context, image, card.x, card.y, card.width, card.height, positions[index] ?? { x: 50, y: 50 }, scales[index] ?? 100);
+    } else {
+      context.fillStyle = "rgba(255,244,199,.86)";
+      context.fillRect(card.x, card.y, card.width, card.height);
+      context.fillStyle = "rgba(47,42,36,.32)";
+      context.font = `900 ${Math.max(30, width * 0.036)}px sans-serif`;
+      context.fillText(`IMAGE ${index + 1}`, card.x + card.width * 0.38, card.y + card.height * 0.52);
+    }
+    context.restore();
+  });
+
+  context.fillStyle = accentColor;
+  context.beginPath();
+  context.arc(width * 0.92, height * 0.08, Math.min(width, height) * 0.045, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "rgba(47,42,36,.82)";
+  roundRect(context, width * 0.06, height * 0.91, 210, 56, 28);
+  context.fill();
+  context.fillStyle = "#ffffff";
+  context.font = "900 28px sans-serif";
+  context.fillText("kejiai.xyz", width * 0.06 + 34, height * 0.91 + 37);
 }
 
 function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitle: string, width: number, height: number, x: number, y: number, style: CoverStyle, options: CoverTextOptions) {
+  const cleanTitle = title.trim();
+  const cleanSubtitle = subtitle.trim();
+  if (!cleanTitle && !cleanSubtitle) return;
+
   const left = (width * x) / 100;
   const top = (height * y) / 100;
   const boxWidth = width * 0.72;
@@ -1481,8 +1979,8 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
   const subtitleSize = Math.max(18, options.subtitleSize * fontScale);
   const titleFont = `900 ${titleSize}px ${options.fontFamily}`;
   const subtitleFont = `900 ${subtitleSize}px ${options.fontFamily}`;
-  const lines = wrapCanvasText(context, title, boxWidth - padding * 2, titleFont);
-  const boxHeight = padding * 2 + lines.length * titleSize * 1.08 + (subtitle ? subtitleSize * 1.75 : 0);
+  const lines = wrapCanvasText(context, cleanTitle, boxWidth - padding * 2, titleFont);
+  const boxHeight = padding * 2 + lines.length * titleSize * 1.08 + (cleanSubtitle ? subtitleSize * 1.75 : 0);
   context.fillStyle = "rgba(255,255,255,.78)";
   context.shadowColor = "rgba(0,0,0,.18)";
   context.shadowBlur = 24;
@@ -1501,7 +1999,7 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
   context.font = titleFont;
   context.textBaseline = "top";
   lines.forEach((line, index) => context.fillText(line, left + padding, top + padding + index * titleSize * 1.08));
-  if (subtitle) {
+  if (cleanSubtitle) {
     if (options.colorMode === "gradient") {
       const subtitleGradient = context.createLinearGradient(left + padding, top, left + boxWidth - padding, top + boxHeight);
       subtitleGradient.addColorStop(0, options.gradientFrom);
@@ -1511,13 +2009,13 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
       context.fillStyle = options.subtitleColor;
     }
     context.font = subtitleFont;
-    context.fillText(subtitle, left + padding, top + padding + lines.length * titleSize * 1.08 + subtitleSize * 0.5);
+    context.fillText(cleanSubtitle, left + padding, top + padding + lines.length * titleSize * 1.08 + subtitleSize * 0.5);
   }
 }
 
 function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number, font: string) {
   context.font = font;
-  const characters = Array.from(text || "爆款封面标题");
+  const characters = Array.from(text);
   const lines: string[] = [];
   let current = "";
   characters.forEach((character) => {
@@ -1543,7 +2041,7 @@ function roundRect(context: CanvasRenderingContext2D, x: number, y: number, widt
   context.closePath();
 }
 
-function ProfileView({ profile, tab, setTab, displayNameDraft, setDisplayNameDraft, newPassword, showNewPassword, setNewPassword, setShowNewPassword, onSaveProfile, onUpdatePassword, onSignOut, isSaving, notice, error, creditItems, creditsError, isCreditsLoading, onRefreshCredits, formatAmount }: { profile: Profile | null; tab: ProfileTab; setTab: (tab: ProfileTab) => void; displayNameDraft: string; setDisplayNameDraft: (value: string) => void; newPassword: string; showNewPassword: boolean; setNewPassword: (value: string) => void; setShowNewPassword: (value: boolean) => void; onSaveProfile: () => void; onUpdatePassword: () => void; onSignOut: () => void; isSaving: boolean; notice: string | null; error: string | null; creditItems: CreditItem[]; creditsError: string | null; isCreditsLoading: boolean; onRefreshCredits: () => void; formatAmount: (amount: number) => string }) {
+function ProfileView({ profile, tab, setTab, displayNameDraft, setDisplayNameDraft, newPassword, showNewPassword, setNewPassword, setShowNewPassword, onSaveProfile, onUpdatePassword, onSignOut, isSaving, notice, error, creditItems, creditsError, isCreditsLoading, onRefreshCredits, formatAmount, rechargeError, rechargingPackageId, onRecharge }: { profile: Profile | null; tab: ProfileTab; setTab: (tab: ProfileTab) => void; displayNameDraft: string; setDisplayNameDraft: (value: string) => void; newPassword: string; showNewPassword: boolean; setNewPassword: (value: string) => void; setShowNewPassword: (value: boolean) => void; onSaveProfile: () => void; onUpdatePassword: () => void; onSignOut: () => void; isSaving: boolean; notice: string | null; error: string | null; creditItems: CreditItem[]; creditsError: string | null; isCreditsLoading: boolean; onRefreshCredits: () => void; formatAmount: (amount: number) => string; rechargeError: string | null; rechargingPackageId: RechargePackageId | null; onRecharge: (packageId: RechargePackageId) => void }) {
   if (!profile) {
     return <EmptyBlock title="请先登录" text="登录后可以查看和修改个人信息。" />;
   }
@@ -1562,6 +2060,7 @@ function ProfileView({ profile, tab, setTab, displayNameDraft, setDisplayNameDra
           <ProfileMenuButton active={tab === "password"} icon={<KeyRound className="h-4 w-4" />} title="密码修改" text="修改登录密码" onClick={() => setTab("password")} />
           <ProfileMenuButton active={tab === "credits"} icon={<ReceiptText className="h-4 w-4" />} title="积分管理" text="查看积分流水" onClick={() => setTab("credits")} />
           <ProfileMenuButton active={tab === "recharge"} icon={<CreditCard className="h-4 w-4" />} title="充值中心" text="购买积分" onClick={() => setTab("recharge")} />
+          <ProfileMenuButton active={tab === "updates"} icon={<History className="h-4 w-4" />} title="更新日志" text="查看版本记录" onClick={() => setTab("updates")} />
           <button type="button" onClick={onSignOut} className="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"><LogOut className="h-4 w-4" />退出登录</button>
         </div>
       </aside>
@@ -1594,32 +2093,69 @@ function ProfileView({ profile, tab, setTab, displayNameDraft, setDisplayNameDra
           <CreditsView profile={profile} items={creditItems} error={creditsError} isLoading={isCreditsLoading} onRefresh={onRefreshCredits} formatAmount={formatAmount} />
         ) : null}
 
-        {tab === "recharge" ? <RechargeCenter /> : null}
+        {tab === "recharge" ? <RechargeCenter error={rechargeError} rechargingPackageId={rechargingPackageId} onRecharge={onRecharge} /> : null}
+        {tab === "updates" ? <UpdateLogPanel /> : null}
       </div>
     </section>
   );
 }
 
-function RechargeCenter() {
+const rechargePackages: Array<{
+  id: RechargePackageId;
+  name: string;
+  price: string;
+  credits: number;
+  tag: string;
+}> = [
+  { id: "starter", name: "轻量体验包", price: "9.9", credits: 1000, tag: "入门推荐" },
+  { id: "creator", name: "稳定创作包", price: "19.9", credits: 2000, tag: "常用选择" },
+  { id: "pro", name: "高频爆款包", price: "29.9", credits: 4000, tag: "最划算" }
+];
+
+function RechargeCenter({ error, rechargingPackageId, onRecharge }: { error: string | null; rechargingPackageId: RechargePackageId | null; onRecharge: (packageId: RechargePackageId) => void }) {
   return (
     <div>
-      <SectionTitle label="充值中心" title="联系管理员购买积分" />
-      <div className="grid gap-5 md:grid-cols-[1fr_260px]">
-        <div className="rounded-2xl bg-white/70 p-5">
-          <p className="text-sm font-semibold text-ink/65">第一版暂未接入自动支付，需要人工充值。添加微信后备注你的账号和充值积分数量。</p>
-          <div className="mt-5 rounded-2xl bg-cream p-4">
-            <p className="text-sm font-bold text-corgi">微信号</p>
-            <p className="mt-1 text-3xl font-black text-ink">KOLOLIDO</p>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Stat label="推荐入门" value={100} />
-            <Stat label="常用套餐" value={500} />
-            <Stat label="批量创作" value={1000} />
-          </div>
+      <SectionTitle label="充值中心" title="微信支付充值积分" />
+      {error ? <ErrorBox text={error} /> : null}
+      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
+        <div className="grid gap-4 md:grid-cols-3">
+          {rechargePackages.map((item) => {
+            const isLoading = rechargingPackageId === item.id;
+            return (
+              <article key={item.id} className="rounded-3xl border border-white/80 bg-white/75 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-corgi">{item.tag}</p>
+                    <h3 className="mt-1 text-xl font-black text-ink">{item.name}</h3>
+                  </div>
+                  <span className="rounded-full bg-cream px-3 py-1 text-xs font-black text-corgi">微信</span>
+                </div>
+                <div className="mt-5">
+                  <p className="text-sm font-bold text-ink/55">售价</p>
+                  <p className="mt-1 text-4xl font-black text-ink">¥{item.price}</p>
+                </div>
+                <div className="mt-4 rounded-2xl bg-cream p-4">
+                  <p className="text-sm font-bold text-ink/55">到账积分</p>
+                  <p className="mt-1 text-3xl font-black text-corgi">{item.credits}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRecharge(item.id)}
+                  disabled={Boolean(rechargingPackageId)}
+                  className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-sm font-black text-white disabled:bg-ink/35"
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                  立即充值
+                </button>
+              </article>
+            );
+          })}
         </div>
-        <div className="rounded-2xl bg-white p-4 text-center shadow-sm">
+        <div className="rounded-3xl bg-white/75 p-4 text-center shadow-sm">
           <img src="/brand/wechat-qr.jpg" alt="微信二维码 KOLOLIDO" className="mx-auto aspect-square w-full max-w-[220px] rounded-2xl border border-ink/10 object-cover" />
-          <p className="mt-3 text-sm font-bold text-ink">扫码添加微信</p>
+          <p className="mt-3 text-sm font-black text-ink">更多优惠和折扣</p>
+          <p className="mt-1 text-2xl font-black text-corgi">KOLOLIDO</p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-ink/55">大额充值、活动折扣或支付异常，可以添加微信联系管理员。</p>
         </div>
       </div>
     </div>
@@ -1632,6 +2168,67 @@ function ProfileMenuButton({ active, icon, title, text, onClick }: { active: boo
       <span className={`grid h-9 w-9 place-items-center rounded-xl ${active ? "bg-white/15" : "bg-skysoft/55 text-corgi"}`}>{icon}</span>
       <span><span className="block text-sm font-black">{title}</span><span className={`block text-xs ${active ? "text-white/60" : "text-ink/50"}`}>{text}</span></span>
     </button>
+  );
+}
+
+function UpdateLogPanel() {
+  const [expanded, setExpanded] = useState(false);
+  const visibleLogs = expanded ? updateLogs : updateLogs.slice(0, 5);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black text-corgi">更新日志</p>
+          <h3 className="text-2xl font-black text-ink">版本记录</h3>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="h-10 rounded-full bg-ink px-4 text-sm font-black text-white"
+        >
+          {expanded ? "收起" : "查看全部"}
+        </button>
+      </div>
+      <div className="mt-5 grid gap-4">
+        {visibleLogs.map((log) => (
+          <article key={log.version} className="rounded-3xl border border-white/80 bg-cream/70 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-corgi">{log.version} · {log.time}</p>
+                <h4 className="mt-1 text-lg font-black text-ink">{log.title}</h4>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {log.items.map((item) => (
+                <p key={item} className="text-sm font-semibold leading-6 text-ink/65">• {item}</p>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSettingsView({ publicNotice, setPublicNotice, notice, error, isSaving, onSave }: { publicNotice: string; setPublicNotice: (value: string) => void; notice: string | null; error: string | null; isSaving: boolean; onSave: () => void }) {
+  return (
+    <section className="rounded-[28px] border border-white/70 bg-white/60 p-5 shadow-glow backdrop-blur">
+      <SectionHeader label="后台配置" title="站点设置" actionLabel="保存公告" loading={isSaving} icon={<Settings2 className="h-4 w-4" />} onAction={onSave} />
+      {notice ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
+      {error ? <ErrorBox text={error} /> : null}
+      <Field label="公共公告">
+        <textarea
+          value={publicNotice}
+          onChange={(event) => setPublicNotice(event.target.value)}
+          rows={5}
+          maxLength={500}
+          className="w-full resize-none rounded-xl border border-corgi/25 bg-white p-3 text-sm font-bold leading-6 text-ink outline-none focus:border-corgi"
+          placeholder="输入展示在导航栏下方的公告内容"
+        />
+      </Field>
+      <p className="mt-2 text-xs font-bold text-ink/45">{publicNotice.length}/500</p>
+    </section>
   );
 }
 
@@ -1701,28 +2298,128 @@ function AdminUsersView({ users, query, setQuery, error, notice, isLoading, savi
   );
 }
 
-function TemplatesAdminView({ templates, error, notice, isLoading, savingTemplateId, onRefresh, onChange, onSave }: { templates: CorgiTemplate[]; error: string | null; notice: string | null; isLoading: boolean; savingTemplateId: string | null; onRefresh: () => void; onChange: (id: string, patch: Partial<CorgiTemplate>) => void; onSave: (template: CorgiTemplate) => void }) {
+function AdminPlazaView({ items, error, notice, isLoading, updatingPostId, onRefresh, onUpdateStatus }: { items: AdminPlazaPost[]; error: string | null; notice: string | null; isLoading: boolean; updatingPostId: string | null; onRefresh: () => void; onUpdateStatus: (post: AdminPlazaPost, status: "published" | "hidden") => void }) {
+  return (
+    <section className="rounded-[28px] border border-white/70 bg-white/60 p-5 shadow-glow backdrop-blur">
+      <SectionHeader label="后台管理" title="广场管理" actionLabel="刷新列表" loading={isLoading} icon={<Images className="h-4 w-4" />} onAction={onRefresh} />
+      {notice ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
+      {error ? <ErrorBox text={error} /> : null}
+      {isLoading && items.length === 0 ? (
+        <LoadingBlock />
+      ) : items.length === 0 ? (
+        <EmptyBlock title="暂无广场作品" text="用户发布到瞬间广场后，会显示在这里。" />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => {
+            const isUpdating = updatingPostId === item.id;
+            const isHidden = item.status === "hidden";
+            return (
+              <article key={item.id} className={`overflow-hidden rounded-3xl border bg-white/75 shadow-sm ${isHidden ? "border-red-200 opacity-75" : "border-white/80"}`}>
+                <div className="relative aspect-square bg-cream">
+                  {item.image_url ? <img src={item.image_url} alt={item.title} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-sm font-black text-ink/35">无图片</div>}
+                  <span className={`absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-black ${isHidden ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-700"}`}>{isHidden ? "已下架" : "展示中"}</span>
+                </div>
+                <div className="p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Avatar name={item.author_name} imageUrl={item.author_avatar_url} />
+                    <div>
+                      <p className="text-sm font-black text-ink">{item.author_name}</p>
+                      <p className="text-xs font-semibold text-ink/45">{item.template_name} · {new Date(item.created_at).toLocaleString("zh-CN")}</p>
+                    </div>
+                  </div>
+                  <h3 className="text-base font-black text-ink">{item.title}</h3>
+                  {item.description ? <p className="mt-2 line-clamp-2 text-sm text-ink/65">{item.description}</p> : null}
+                  <div className="mt-3 flex gap-2 text-xs font-black text-ink/55">
+                    <span className="rounded-full bg-cream px-3 py-1">赞 {item.like_count}</span>
+                    <span className="rounded-full bg-cream px-3 py-1">藏 {item.favorite_count}</span>
+                    <span className="rounded-full bg-cream px-3 py-1">热度 {item.hot_score}</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => onUpdateStatus(item, isHidden ? "published" : "hidden")}
+                    className={`mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-black disabled:opacity-50 ${isHidden ? "bg-emerald-700 text-white" : "bg-red-50 text-red-600 ring-1 ring-red-200"}`}
+                  >
+                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {isHidden ? "恢复上架" : "下架作品"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function TemplatesAdminView({ templates, error, notice, isLoading, savingTemplateId, deletingTemplateId, onRefresh, onCreate, onChange, onSave, onDelete }: { templates: CorgiTemplate[]; error: string | null; notice: string | null; isLoading: boolean; savingTemplateId: string | null; deletingTemplateId: string | null; onRefresh: () => void; onCreate: () => void; onChange: (id: string, patch: Partial<CorgiTemplate>) => void; onSave: (template: CorgiTemplate) => void; onDelete: (template: CorgiTemplate) => void }) {
   return (
     <section className="rounded-[28px] border border-white/70 bg-white/60 p-5 shadow-glow backdrop-blur">
       <SectionHeader label="后台配置" title="模板管理" actionLabel="刷新模板" loading={isLoading} icon={<Settings2 className="h-4 w-4" />} onAction={onRefresh} />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={onCreate} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-corgi px-4 text-sm font-black text-white">
+          <Sparkles className="h-4 w-4" />新增模板
+        </button>
+        <p className="text-xs font-bold text-ink/50">排序数字越小越靠前；未上架模板只有管理员可见。</p>
+      </div>
       {notice ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
       {error ? <ErrorBox text={error} /> : null}
       <div className="grid gap-4 lg:grid-cols-2">
-        {templates.map((template) => (
+        {[...templates].sort((left, right) => left.sort_order - right.sort_order).map((template) => (
           <article key={template.id} className="rounded-2xl border border-white/80 bg-white/70 p-4">
             <div className="mb-3 flex items-start justify-between gap-3">
-              <div><p className="text-xs font-bold text-ink/45">{template.id}</p><h3 className="text-xl font-black text-ink">{template.name}</h3></div>
-              <label className="flex items-center gap-2 text-sm font-bold text-ink"><input type="checkbox" checked={template.is_active} onChange={(event) => onChange(template.id, { is_active: event.target.checked })} />上架</label>
+              <div>
+                <p className="break-all text-xs font-bold text-ink/45">{template.id}</p>
+                <h3 className="text-xl font-black text-ink">{template.name}</h3>
+              </div>
+              <label className="flex shrink-0 items-center gap-2 text-sm font-bold text-ink">
+                <input type="checkbox" checked={template.is_active} onChange={(event) => onChange(template.id, { is_active: event.target.checked })} />上架
+              </label>
             </div>
+
+            <div className="mb-4 grid gap-3 sm:grid-cols-[140px_1fr]">
+              <div className="overflow-hidden rounded-2xl border border-corgi/20 bg-cream">
+                {template.cover_url ? (
+                  <img src={template.cover_url} alt={template.name} className="aspect-square w-full object-cover" />
+                ) : (
+                  <div className="grid aspect-square place-items-center text-xs font-black text-ink/35">暂无封面</div>
+                )}
+              </div>
+              <div className="grid content-start gap-3">
+                <Field label="封面图片 URL">
+                  <input value={template.cover_url ?? ""} onChange={(event) => onChange(template.id, { cover_url: event.target.value || null })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" placeholder="/template-covers/example.png 或 https://..." />
+                </Field>
+                <label className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-dashed border-corgi/40 bg-white/70 text-sm font-black text-corgi hover:bg-cream">
+                  上传本地封面
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => onChange(template.id, { cover_url: String(reader.result ?? "") });
+                      reader.readAsDataURL(file);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="模板名称"><input value={template.name} onChange={(event) => onChange(template.id, { name: event.target.value })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" /></Field>
               <Field label="消耗积分"><input type="number" min={1} value={template.cost} onChange={(event) => onChange(template.id, { cost: Number(event.target.value) })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" /></Field>
               <Field label="描述"><input value={template.description} onChange={(event) => onChange(template.id, { description: event.target.value, tagline: event.target.value })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" /></Field>
               <Field label="排序"><input type="number" value={template.sort_order} onChange={(event) => onChange(template.id, { sort_order: Number(event.target.value) })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" /></Field>
             </div>
-            <Field label="封面 URL"><input value={template.cover_url ?? ""} onChange={(event) => onChange(template.id, { cover_url: event.target.value || null })} className="h-11 w-full rounded-xl border border-corgi/25 bg-white px-3 text-sm outline-none focus:border-corgi" placeholder="可选，用于模板卡片封面" /></Field>
             <Field label="提示词"><textarea value={template.prompt} onChange={(event) => onChange(template.id, { prompt: event.target.value })} rows={5} className="w-full resize-none rounded-xl border border-corgi/25 bg-white p-3 text-sm outline-none focus:border-corgi" /></Field>
-            <button type="button" onClick={() => onSave(template)} disabled={savingTemplateId === template.id} className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ink text-sm font-black text-white disabled:bg-ink/35">{savingTemplateId === template.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}保存模板</button>
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <button type="button" onClick={() => onSave(template)} disabled={savingTemplateId === template.id || deletingTemplateId === template.id} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-black text-white disabled:bg-ink/35">{savingTemplateId === template.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}保存模板</button>
+              <button type="button" onClick={() => onDelete(template)} disabled={savingTemplateId === template.id || deletingTemplateId === template.id} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-black text-red-600 disabled:opacity-50">{deletingTemplateId === template.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}删除</button>
+            </div>
           </article>
         ))}
       </div>
