@@ -137,6 +137,12 @@ const creditTypeLabel: Record<CreditItem["type"], string> = {
 
 const updateLogs = [
   {
+    version: "V1.5",
+    time: "2026-07-12 16:30",
+    title: "爆款封面细节优化",
+    items: ["新增文字描边和 3D 效果", "支持描边颜色和边框颜色自由选择", "优化字体风格差异和封面导出一致性"]
+  },
+  {
     version: "V1.4",
     time: "2026-07-03 10:30",
     title: "充值中心升级",
@@ -1279,9 +1285,12 @@ type StackDragLayer = "stack-0" | "stack-1" | "stack-2";
 type DragLayer = "title" | "background" | "person" | StackDragLayer;
 type CoverFont = "sans" | "serif" | "rounded" | "mono";
 type TextColorMode = "solid" | "gradient";
+type TextEffect = "none" | "stroke" | "threeD";
 
 type CoverTextOptions = {
   fontFamily: string;
+  fontWeight: number;
+  letterSpacing: number;
   titleSize: number;
   subtitleSize: number;
   colorMode: TextColorMode;
@@ -1289,6 +1298,9 @@ type CoverTextOptions = {
   subtitleColor: string;
   gradientFrom: string;
   gradientTo: string;
+  effect: TextEffect;
+  strokeColor: string;
+  depthColor: string;
 };
 
 const coverSizes: Record<CoverSize, { label: string; width: number; height: number; ratio: string }> = {
@@ -1296,11 +1308,11 @@ const coverSizes: Record<CoverSize, { label: string; width: number; height: numb
   video: { label: "长视频 16:9", width: 1920, height: 1080, ratio: "16 / 9" }
 };
 
-const coverFonts: Record<CoverFont, { label: string; family: string }> = {
-  sans: { label: "黑体醒目", family: "Arial, Helvetica, sans-serif" },
-  rounded: { label: "圆润可爱", family: "'Trebuchet MS', Arial, sans-serif" },
-  serif: { label: "杂志宋体", family: "Georgia, 'Times New Roman', serif" },
-  mono: { label: "科技等宽", family: "'Courier New', Consolas, monospace" }
+const coverFonts: Record<CoverFont, { label: string; sample: string; family: string; weight: number; letterSpacing: number; lineHeight: number; note: string }> = {
+  sans: { label: "爆款黑体", sample: "强冲击", family: "'Arial Black', 'Microsoft YaHei', SimHei, sans-serif", weight: 900, letterSpacing: 0, lineHeight: 1.02, note: "粗重紧凑" },
+  rounded: { label: "幼圆软萌", sample: "圆圆可爱", family: "'幼圆', YouYuan, 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif", weight: 400, letterSpacing: 6, lineHeight: 1.16, note: "幼圆原字形" },
+  serif: { label: "杂志宋体", sample: "高级感", family: "SimSun, 'Songti SC', Georgia, serif", weight: 800, letterSpacing: 14, lineHeight: 1.16, note: "标题感强" },
+  mono: { label: "科技等宽", sample: "AI-2026", family: "Consolas, 'Courier New', 'Microsoft YaHei', monospace", weight: 850, letterSpacing: 12, lineHeight: 1.08, note: "英文数字等宽" }
 };
 
 const coverStyles: Record<CoverStyle, { label: string; title: string; subtitle: string; accent: string; bg: string; shadow: string }> = {
@@ -1357,6 +1369,9 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
   const [subtitleColor, setSubtitleColor] = useState("#7a4b18");
   const [gradientFrom, setGradientFrom] = useState("#ff7a1a");
   const [gradientTo, setGradientTo] = useState("#22b8cf");
+  const [textEffect, setTextEffect] = useState<TextEffect>("none");
+  const [strokeColor, setStrokeColor] = useState("#ffffff");
+  const [borderColor, setBorderColor] = useState("#ff4f7b");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [personUrl, setPersonUrl] = useState<string | null>(null);
   const [stackImageUrls, setStackImageUrls] = useState<Array<string | null>>([null, null, null]);
@@ -1386,20 +1401,25 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
   const selectedFont = coverFonts[coverFont];
   const textOptions: CoverTextOptions = {
     fontFamily: selectedFont.family,
+    fontWeight: selectedFont.weight,
+    letterSpacing: selectedFont.letterSpacing,
     titleSize: titleFontSize,
     subtitleSize: subtitleFontSize,
     colorMode: textColorMode,
     titleColor,
     subtitleColor,
     gradientFrom,
-    gradientTo
+    gradientTo,
+    effect: textEffect,
+    strokeColor,
+    depthColor: borderColor
   };
   const titlePreviewStyle = textColorMode === "gradient"
-    ? { fontFamily: selectedFont.family, fontSize: `clamp(28px, ${titleFontSize / 12}vw, ${titleFontSize}px)`, backgroundImage: `linear-gradient(120deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: "text", color: "transparent" }
-    : { fontFamily: selectedFont.family, fontSize: `clamp(28px, ${titleFontSize / 12}vw, ${titleFontSize}px)`, color: titleColor };
+    ? { fontFamily: selectedFont.family, fontWeight: selectedFont.weight, lineHeight: selectedFont.lineHeight, letterSpacing: `${(selectedFont.letterSpacing / 1080) * 100}cqw`, fontSize: `${(titleFontSize / 1080) * 100}cqw`, backgroundImage: `linear-gradient(120deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: "text", color: "transparent", WebkitTextStroke: textEffect === "stroke" ? `0.04em ${strokeColor}` : textEffect === "threeD" ? `0.018em ${strokeColor}` : undefined, textShadow: textEffect === "threeD" ? `0.04em 0.04em 0 ${borderColor}, 0.085em 0.085em 0 ${hexToRgba(borderColor, 0.48)}, 0.13em 0.13em 0.18em rgba(0,0,0,.28)` : textEffect === "stroke" ? "0 0.045em 0.08em rgba(0,0,0,.2)" : undefined }
+    : { fontFamily: selectedFont.family, fontWeight: selectedFont.weight, lineHeight: selectedFont.lineHeight, letterSpacing: `${(selectedFont.letterSpacing / 1080) * 100}cqw`, fontSize: `${(titleFontSize / 1080) * 100}cqw`, color: titleColor, WebkitTextStroke: textEffect === "stroke" ? `0.04em ${strokeColor}` : textEffect === "threeD" ? `0.018em ${strokeColor}` : undefined, textShadow: textEffect === "threeD" ? `0.04em 0.04em 0 ${borderColor}, 0.085em 0.085em 0 ${hexToRgba(borderColor, 0.48)}, 0.13em 0.13em 0.18em rgba(0,0,0,.28)` : textEffect === "stroke" ? "0 0.045em 0.08em rgba(0,0,0,.2)" : undefined };
   const subtitlePreviewStyle = textColorMode === "gradient"
-    ? { fontFamily: selectedFont.family, fontSize: `clamp(14px, ${subtitleFontSize / 14}vw, ${subtitleFontSize}px)`, backgroundImage: `linear-gradient(120deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: "text", color: "transparent" }
-    : { fontFamily: selectedFont.family, fontSize: `clamp(14px, ${subtitleFontSize / 14}vw, ${subtitleFontSize}px)`, color: subtitleColor };
+    ? { fontFamily: selectedFont.family, fontWeight: Math.max(400, selectedFont.weight - 80), lineHeight: selectedFont.lineHeight, letterSpacing: `${(selectedFont.letterSpacing * 0.7 / 1080) * 100}cqw`, fontSize: `${(subtitleFontSize / 1080) * 100}cqw`, backgroundImage: `linear-gradient(120deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: "text", color: "transparent", WebkitTextStroke: textEffect === "stroke" ? `0.028em ${strokeColor}` : undefined, textShadow: textEffect === "threeD" ? `0.04em 0.04em 0 ${hexToRgba(borderColor, 0.85)}, 0.08em 0.08em 0.14em rgba(0,0,0,.2)` : textEffect === "stroke" ? "0 0.035em 0.07em rgba(0,0,0,.16)" : undefined }
+    : { fontFamily: selectedFont.family, fontWeight: Math.max(400, selectedFont.weight - 80), lineHeight: selectedFont.lineHeight, letterSpacing: `${(selectedFont.letterSpacing * 0.7 / 1080) * 100}cqw`, fontSize: `${(subtitleFontSize / 1080) * 100}cqw`, color: subtitleColor, WebkitTextStroke: textEffect === "stroke" ? `0.028em ${strokeColor}` : undefined, textShadow: textEffect === "threeD" ? `0.04em 0.04em 0 ${hexToRgba(borderColor, 0.85)}, 0.08em 0.08em 0.14em rgba(0,0,0,.2)` : textEffect === "stroke" ? "0 0.035em 0.07em rgba(0,0,0,.16)" : undefined };
 
   useEffect(() => {
     return () => {
@@ -1472,16 +1492,8 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
       if (!context) throw new Error("浏览器不支持图片处理。");
       context.drawImage(image, 0, 0);
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      for (let index = 0; index < imageData.data.length; index += 4) {
-        const red = imageData.data[index];
-        const green = imageData.data[index + 1];
-        const blue = imageData.data[index + 2];
-        const max = Math.max(red, green, blue);
-        const min = Math.min(red, green, blue);
-        const isLightBackground = max > 220 && max - min < 38;
-        const isGreenScreen = green > 130 && green > red * 1.18 && green > blue * 1.18;
-        if (isLightBackground || isGreenScreen) imageData.data[index + 3] = 0;
-      }
+      const backgroundMask = createEdgeBackgroundMask(imageData, canvas.width, canvas.height);
+      applyCutoutMask(imageData, backgroundMask, canvas.width, canvas.height);
       context.putImageData(imageData, 0, 0);
       if (personUrl.startsWith("blob:")) URL.revokeObjectURL(personUrl);
       setPersonUrl(canvas.toDataURL("image/png"));
@@ -1502,13 +1514,13 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
       drawCoverBase(context, size.width, size.height, coverStyle);
       if (coverLayout === "threeStack") {
         const loadedImages = await Promise.all(stackImageUrls.map((url) => (url ? loadCanvasImage(url) : Promise.resolve(null))));
-        drawThreeStackCover(context, loadedImages, stackImagePositions, stackImageScales, size.width, size.height, coverStyle);
+        drawThreeStackCover(context, loadedImages, stackImagePositions, stackImageScales, size.width, size.height, borderColor);
       } else {
         if (backgroundUrl) {
           const background = await loadCanvasImage(backgroundUrl);
           drawCoverImage(context, background, size.width, size.height, backgroundPosition.x, backgroundPosition.y, 1.16);
         }
-        drawCoverOverlay(context, size.width, size.height, coverStyle);
+        drawCoverOverlay(context, size.width, size.height, borderColor);
         if (personUrl) {
           const person = await loadCanvasImage(personUrl);
           const personWidth = (size.width * personScale) / 100;
@@ -1607,12 +1619,9 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             </div>
           </Field>
           <Field label="边框颜色">
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(coverStyles) as CoverStyle[]).map((item) => (
-                <button key={item} type="button" onClick={() => setCoverStyle(item)} className={`h-11 rounded-xl text-sm font-black ${coverStyle === item ? "bg-corgi text-white" : "bg-white text-ink"}`}>
-                  {coverStyles[item].label}
-                </button>
-              ))}
+            <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl bg-white p-2">
+              <input type="color" value={borderColor} onChange={(event) => setBorderColor(event.target.value)} className="h-11 w-full rounded-xl border border-white bg-white p-1" />
+              <span className="rounded-xl bg-cream px-3 py-2 text-xs font-black text-ink">{borderColor.toUpperCase()}</span>
             </div>
           </Field>
           <Field label="标题">
@@ -1626,8 +1635,10 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             <Field label="字体">
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(coverFonts) as CoverFont[]).map((item) => (
-                  <button key={item} type="button" onClick={() => setCoverFont(item)} className={`h-10 rounded-xl text-xs font-black ${coverFont === item ? "bg-ink text-white" : "bg-cream text-ink"}`} style={{ fontFamily: coverFonts[item].family }}>
-                    {coverFonts[item].label}
+                  <button key={item} type="button" onClick={() => setCoverFont(item)} className={`min-h-[74px] rounded-xl px-3 py-2 text-left transition ${coverFont === item ? "bg-ink text-white" : "bg-cream text-ink hover:bg-biscuit"}`}>
+                    <span className="block text-lg leading-none" style={{ fontFamily: coverFonts[item].family, fontWeight: coverFonts[item].weight, letterSpacing: `${coverFonts[item].letterSpacing / 8}px` }}>{coverFonts[item].sample}</span>
+                    <span className="mt-2 block text-xs font-black">{coverFonts[item].label}</span>
+                    <span className={`mt-1 block text-[10px] font-bold ${coverFont === item ? "text-white/60" : "text-ink/45"}`}>{coverFonts[item].note}</span>
                   </button>
                 ))}
               </div>
@@ -1644,6 +1655,27 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
                 <button type="button" onClick={() => setTextColorMode("gradient")} className={`h-10 rounded-xl text-xs font-black ${textColorMode === "gradient" ? "bg-ink text-white" : "bg-cream text-ink"}`}>渐变色</button>
               </div>
             </Field>
+            <Field label="文字特效">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "none", label: "无特效" },
+                  { id: "stroke", label: "描边" },
+                  { id: "threeD", label: "3D" }
+                ].map((item) => (
+                  <button key={item.id} type="button" onClick={() => setTextEffect(item.id as TextEffect)} className={`h-10 rounded-xl text-xs font-black ${textEffect === item.id ? "bg-ink text-white" : "bg-cream text-ink"}`}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            {textEffect !== "none" ? (
+              <Field label={textEffect === "stroke" ? "描边颜色" : "高光描边"}>
+                <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl bg-white p-2">
+                  <input type="color" value={strokeColor} onChange={(event) => setStrokeColor(event.target.value)} className="h-11 w-full rounded-xl border border-white bg-white p-1" />
+                  <span className="rounded-xl bg-cream px-3 py-2 text-xs font-black text-ink">{strokeColor.toUpperCase()}</span>
+                </div>
+              </Field>
+            ) : null}
             {textColorMode === "solid" ? (
               <div className="grid grid-cols-2 gap-3">
                 <Field label="标题颜色">
@@ -1751,7 +1783,7 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-bold text-corgi">实时预览</p>
-            <h2 className="text-2xl font-black text-ink">{style.label} · {size.width}×{size.height}</h2>
+            <h2 className="text-2xl font-black text-ink">封面预览 · {size.width}×{size.height}</h2>
           </div>
           <button type="button" onClick={exportPng} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 text-sm font-black text-white"><Download className="h-4 w-4" />导出 PNG</button>
         </div>
@@ -1761,7 +1793,7 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             onPointerMove={handlePointerMove}
             onPointerUp={() => setActiveDrag(null)}
             onPointerLeave={() => setActiveDrag(null)}
-            className={`relative w-full select-none overflow-hidden rounded-[28px] border border-white bg-gradient-to-br ${style.bg} shadow-glow`}
+            className={`relative w-full select-none overflow-hidden rounded-[28px] border border-white bg-gradient-to-br ${style.bg} shadow-glow [container-type:inline-size]`}
             style={{ aspectRatio: size.ratio }}
           >
             {coverLayout === "threeStack" ? (
@@ -1797,7 +1829,7 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
               <div className="absolute inset-0 grid place-items-center text-center text-sm font-black text-ink/25">上传背景图或从我的作品选择</div>
             )}
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,.82),transparent_32%),linear-gradient(180deg,rgba(255,244,199,.4),rgba(255,255,255,.08))]" />
-            <div className={`absolute right-[7%] top-[7%] h-16 w-16 rounded-full ${style.accent} opacity-90 blur-[1px]`} />
+            <div className="absolute right-[7%] top-[7%] h-16 w-16 rounded-full opacity-90 blur-[1px]" style={{ backgroundColor: borderColor }} />
             {personUrl ? (
               <img
                 src={personUrl}
@@ -1811,7 +1843,7 @@ function CoverWorkshopView({ historyItems, isHistoryLoading, onRefreshHistory }:
             <div
               onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActiveDrag("title"); }}
               className="absolute z-20 max-w-[78%] cursor-grab rounded-3xl bg-white/72 p-[4%] shadow-xl backdrop-blur-sm"
-              style={{ left: `${titlePosition.x}%`, top: `${titlePosition.y}%`, boxShadow: style.shadow }}
+              style={{ left: `${titlePosition.x}%`, top: `${titlePosition.y}%`, boxShadow: `0 10px 0 ${hexToRgba(borderColor, 0.24)}` }}
             >
               <h3 className="break-words font-black leading-[1.04] tracking-normal" style={titlePreviewStyle}>{title}</h3>
               {subtitle ? <p className="mt-3 break-words font-black tracking-normal" style={subtitlePreviewStyle}>{subtitle}</p> : null}
@@ -1841,6 +1873,128 @@ function canvasToPngBlob(canvas: HTMLCanvasElement) {
       else reject(new Error("PNG export failed."));
     }, "image/png");
   });
+}
+
+function createEdgeBackgroundMask(imageData: ImageData, width: number, height: number) {
+  const data = imageData.data;
+  const mask = new Uint8Array(width * height);
+  const visited = new Uint8Array(width * height);
+  const queue: number[] = [];
+  const background = sampleEdgeBackgroundColor(data, width, height);
+
+  function enqueue(pixelIndex: number) {
+    if (visited[pixelIndex]) return;
+    visited[pixelIndex] = 1;
+    const dataIndex = pixelIndex * 4;
+    if (!isCutoutBackgroundPixel(data, dataIndex, background)) return;
+    mask[pixelIndex] = 1;
+    queue.push(pixelIndex);
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x);
+    enqueue((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y += 1) {
+    enqueue(y * width);
+    enqueue(y * width + width - 1);
+  }
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const pixelIndex = queue[cursor];
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    if (x > 0) enqueue(pixelIndex - 1);
+    if (x < width - 1) enqueue(pixelIndex + 1);
+    if (y > 0) enqueue(pixelIndex - width);
+    if (y < height - 1) enqueue(pixelIndex + width);
+  }
+
+  return mask;
+}
+
+function sampleEdgeBackgroundColor(data: Uint8ClampedArray, width: number, height: number) {
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let count = 0;
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 48));
+
+  function collect(x: number, y: number) {
+    const index = (y * width + x) * 4;
+    if (data[index + 3] < 12) return;
+    red += data[index];
+    green += data[index + 1];
+    blue += data[index + 2];
+    count += 1;
+  }
+
+  for (let x = 0; x < width; x += step) {
+    collect(x, 0);
+    collect(x, height - 1);
+  }
+  for (let y = 0; y < height; y += step) {
+    collect(0, y);
+    collect(width - 1, y);
+  }
+
+  return count > 0
+    ? { red: red / count, green: green / count, blue: blue / count }
+    : { red: 255, green: 255, blue: 255 };
+}
+
+function isCutoutBackgroundPixel(data: Uint8ClampedArray, index: number, background: { red: number; green: number; blue: number }) {
+  const red = data[index];
+  const green = data[index + 1];
+  const blue = data[index + 2];
+  const alpha = data[index + 3];
+  if (alpha < 12) return true;
+
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const backgroundDistance = Math.sqrt(
+    (red - background.red) ** 2 +
+      (green - background.green) ** 2 +
+      (blue - background.blue) ** 2
+  );
+  const backgroundBrightness = (background.red + background.green + background.blue) / 3;
+  const isSimilarToEdge = backgroundDistance < (backgroundBrightness > 210 ? 72 : 54);
+  const isLightNeutral = max > 228 && max - min < 42;
+  const isGreenScreen = green > 130 && green > red * 1.18 && green > blue * 1.18;
+
+  return isSimilarToEdge || isLightNeutral || isGreenScreen;
+}
+
+function applyCutoutMask(imageData: ImageData, mask: Uint8Array, width: number, height: number) {
+  const data = imageData.data;
+  for (let pixelIndex = 0; pixelIndex < mask.length; pixelIndex += 1) {
+    if (!mask[pixelIndex]) continue;
+    data[pixelIndex * 4 + 3] = 0;
+  }
+
+  const originalAlpha = new Uint8ClampedArray(mask.length);
+  for (let pixelIndex = 0; pixelIndex < mask.length; pixelIndex += 1) {
+    originalAlpha[pixelIndex] = data[pixelIndex * 4 + 3];
+  }
+
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const pixelIndex = y * width + x;
+      if (mask[pixelIndex] || originalAlpha[pixelIndex] === 0) continue;
+      const touchesBackground =
+        mask[pixelIndex - 1] ||
+        mask[pixelIndex + 1] ||
+        mask[pixelIndex - width] ||
+        mask[pixelIndex + width] ||
+        mask[pixelIndex - width - 1] ||
+        mask[pixelIndex - width + 1] ||
+        mask[pixelIndex + width - 1] ||
+        mask[pixelIndex + width + 1];
+      if (touchesBackground) {
+        data[pixelIndex * 4 + 3] = Math.min(originalAlpha[pixelIndex], 205);
+      }
+    }
+  }
 }
 
 function drawCoverBase(context: CanvasRenderingContext2D, width: number, height: number, style: CoverStyle) {
@@ -1874,10 +2028,18 @@ function drawCoverImage(context: CanvasRenderingContext2D, image: HTMLImageEleme
   context.drawImage(image, left, top, drawWidth, drawHeight);
 }
 
-function drawCoverOverlay(context: CanvasRenderingContext2D, width: number, height: number, style: CoverStyle) {
+function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace("#", "");
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function drawCoverOverlay(context: CanvasRenderingContext2D, width: number, height: number, accentColor: string) {
   context.fillStyle = "rgba(255,255,255,.18)";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = style === "redbook" ? "rgba(255,79,123,.9)" : style === "ai" ? "rgba(84,198,235,.9)" : style === "tutorial" ? "rgba(31,143,106,.9)" : "rgba(245,158,61,.9)";
+  context.fillStyle = hexToRgba(accentColor, 0.92);
   context.beginPath();
   context.arc(width * 0.9, height * 0.1, Math.min(width, height) * 0.06, 0, Math.PI * 2);
   context.fill();
@@ -1921,10 +2083,9 @@ function drawImageCoverInRect(context: CanvasRenderingContext2D, image: HTMLImag
   context.drawImage(image, left, top, drawWidth, drawHeight);
 }
 
-function drawThreeStackCover(context: CanvasRenderingContext2D, images: Array<HTMLImageElement | null>, positions: Array<{ x: number; y: number }>, scales: number[], width: number, height: number, style: CoverStyle) {
+function drawThreeStackCover(context: CanvasRenderingContext2D, images: Array<HTMLImageElement | null>, positions: Array<{ x: number; y: number }>, scales: number[], width: number, height: number, accentColor: string) {
   context.fillStyle = "rgba(255,255,255,.2)";
   context.fillRect(0, 0, width, height);
-  const accentColor = style === "redbook" ? "#ff4f7b" : style === "ai" ? "#54c6eb" : style === "tutorial" ? "#1f8f6a" : "#f59e3d";
   const cards = getThreeStackLayout(width, height);
 
   images.forEach((image, index) => {
@@ -1977,9 +2138,10 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
   const fontScale = width / 1080;
   const titleSize = Math.max(32, options.titleSize * fontScale);
   const subtitleSize = Math.max(18, options.subtitleSize * fontScale);
-  const titleFont = `900 ${titleSize}px ${options.fontFamily}`;
-  const subtitleFont = `900 ${subtitleSize}px ${options.fontFamily}`;
-  const lines = wrapCanvasText(context, cleanTitle, boxWidth - padding * 2, titleFont);
+  const titleFont = `${options.fontWeight} ${titleSize}px ${options.fontFamily}`;
+  const subtitleFont = `${Math.max(400, options.fontWeight - 80)} ${subtitleSize}px ${options.fontFamily}`;
+  const letterSpacing = options.letterSpacing * fontScale;
+  const lines = wrapCanvasText(context, cleanTitle, boxWidth - padding * 2, titleFont, letterSpacing);
   const boxHeight = padding * 2 + lines.length * titleSize * 1.08 + (cleanSubtitle ? subtitleSize * 1.75 : 0);
   context.fillStyle = "rgba(255,255,255,.78)";
   context.shadowColor = "rgba(0,0,0,.18)";
@@ -1998,7 +2160,7 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
   }
   context.font = titleFont;
   context.textBaseline = "top";
-  lines.forEach((line, index) => context.fillText(line, left + padding, top + padding + index * titleSize * 1.08));
+  lines.forEach((line, index) => drawStyledCanvasText(context, line, left + padding, top + padding + index * titleSize * 1.08, titleSize, options, false, letterSpacing));
   if (cleanSubtitle) {
     if (options.colorMode === "gradient") {
       const subtitleGradient = context.createLinearGradient(left + padding, top, left + boxWidth - padding, top + boxHeight);
@@ -2009,18 +2171,69 @@ function drawCoverText(context: CanvasRenderingContext2D, title: string, subtitl
       context.fillStyle = options.subtitleColor;
     }
     context.font = subtitleFont;
-    context.fillText(cleanSubtitle, left + padding, top + padding + lines.length * titleSize * 1.08 + subtitleSize * 0.5);
+    drawStyledCanvasText(context, cleanSubtitle, left + padding, top + padding + lines.length * titleSize * 1.08 + subtitleSize * 0.5, subtitleSize, options, true, letterSpacing * 0.7);
   }
 }
 
-function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number, font: string) {
+function drawStyledCanvasText(context: CanvasRenderingContext2D, text: string, x: number, y: number, fontSize: number, options: CoverTextOptions, isSubtitle = false, letterSpacing = 0) {
+  const fillStyle = context.fillStyle;
+  if (options.effect === "threeD") {
+    context.save();
+    context.shadowColor = "rgba(0,0,0,.25)";
+    context.shadowBlur = fontSize * 0.12;
+    context.fillStyle = "rgba(47,42,36,.28)";
+    drawCanvasTextWithSpacing(context, text, x + fontSize * 0.12, y + fontSize * 0.12, letterSpacing, "fill");
+    context.fillStyle = hexToRgba(options.depthColor, isSubtitle ? 0.82 : 1);
+    drawCanvasTextWithSpacing(context, text, x + fontSize * 0.075, y + fontSize * 0.075, letterSpacing, "fill");
+    context.fillStyle = hexToRgba(options.depthColor, 0.72);
+    drawCanvasTextWithSpacing(context, text, x + fontSize * 0.04, y + fontSize * 0.04, letterSpacing, "fill");
+    context.restore();
+    context.save();
+    context.lineJoin = "round";
+    context.lineWidth = Math.max(2, fontSize * 0.028);
+    context.strokeStyle = options.strokeColor;
+    drawCanvasTextWithSpacing(context, text, x, y, letterSpacing, "stroke");
+    context.restore();
+  }
+
+  if (options.effect === "stroke") {
+    context.save();
+    context.lineJoin = "round";
+    context.lineWidth = Math.max(3, fontSize * (isSubtitle ? 0.055 : 0.08));
+    context.strokeStyle = options.strokeColor;
+    context.shadowColor = "rgba(0,0,0,.18)";
+    context.shadowBlur = fontSize * 0.08;
+    drawCanvasTextWithSpacing(context, text, x, y, letterSpacing, "stroke");
+    context.restore();
+  }
+
+  context.fillStyle = fillStyle;
+  drawCanvasTextWithSpacing(context, text, x, y, letterSpacing, "fill");
+}
+
+function drawCanvasTextWithSpacing(context: CanvasRenderingContext2D, text: string, x: number, y: number, letterSpacing: number, mode: "fill" | "stroke") {
+  let cursor = x;
+  Array.from(text).forEach((character) => {
+    if (mode === "stroke") context.strokeText(character, cursor, y);
+    else context.fillText(character, cursor, y);
+    cursor += context.measureText(character).width + letterSpacing;
+  });
+}
+
+function measureCanvasTextWithSpacing(context: CanvasRenderingContext2D, text: string, letterSpacing: number) {
+  const characters = Array.from(text);
+  if (characters.length === 0) return 0;
+  return characters.reduce((sum, character) => sum + context.measureText(character).width, 0) + Math.max(0, characters.length - 1) * letterSpacing;
+}
+
+function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number, font: string, letterSpacing = 0) {
   context.font = font;
   const characters = Array.from(text);
   const lines: string[] = [];
   let current = "";
   characters.forEach((character) => {
     const next = current + character;
-    if (context.measureText(next).width > maxWidth && current) {
+    if (measureCanvasTextWithSpacing(context, next, letterSpacing) > maxWidth && current) {
       lines.push(current);
       current = character;
     } else {
